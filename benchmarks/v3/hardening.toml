@@ -1,0 +1,25 @@
+suite = "v3_informal_reasoning_ablation"
+version = 1
+
+[[case]]
+id = "user_my_v3"
+path = "cases/29_user_my_v3.lean"
+mode = "generation"
+max_rounds = 3
+purpose = "Replay the user's failed theorem without a supplied proof strategy."
+reference_proof = "by nlinarith [sq_nonneg (x - y)]"
+
+[[case]]
+id = "invalid_rewrite"
+path = "cases/30_invalid_rewrite.lean"
+mode = "repair"
+max_rounds = 3
+purpose = "Recover immediately from the observed invalid rewrite while preserving useful mathematics."
+reference_proof = "by nlinarith [sq_nonneg (x - y)]"
+
+[[case]]
+id = "false_division"
+path = "cases/28_negative_division_zero.lean"
+mode = "negative"
+max_rounds = 2
+purpose = "Informal reasoning and retrieval must not make division by zero cancellation valid."

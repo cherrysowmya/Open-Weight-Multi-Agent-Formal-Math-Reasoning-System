@@ -1,0 +1,65 @@
+suite = "v3_informal_reasoning_ablation"
+version = 1
+# Focused mathematical-strategy diagnostic set; not a held-out research benchmark.
+
+[[case]]
+id = "square_difference"
+path = "cases/21_square_difference.lean"
+mode = "generation"
+max_rounds = 4
+purpose = "Find the intermediate inequality 0 ≤ (x-y)^2, expand, and rearrange"
+reference_proof = "by\n  nlinarith [sq_nonneg (x-y)]"
+
+[[case]]
+id = "square_of_difference"
+path = "cases/22_square_of_difference.lean"
+mode = "generation"
+max_rounds = 4
+purpose = "Apply square nonnegativity to a compound expression"
+reference_proof = "by\n  exact sq_nonneg (a-b)"
+
+[[case]]
+id = "sum_nonnegative"
+path = "cases/23_sum_nonnegative.lean"
+mode = "generation"
+max_rounds = 4
+purpose = "Use both local nonnegativity hypotheses"
+reference_proof = "by\n  exact add_nonneg ha hb"
+
+[[case]]
+id = "sum_of_squares"
+path = "cases/24_sum_of_squares.lean"
+mode = "generation"
+max_rounds = 4
+purpose = "Decompose into two intermediate square nonnegativity facts"
+reference_proof = "by\n  exact add_nonneg (sq_nonneg a) (sq_nonneg b)"
+
+[[case]]
+id = "absolute_value_bound"
+path = "cases/25_absolute_value_bound.lean"
+mode = "generation"
+max_rounds = 4
+purpose = "Handle the negative case or retrieve a correct absolute-value bound"
+reference_proof = "by\n  exact le_abs_self x"
+
+[[case]]
+id = "repair_square_difference"
+path = "cases/26_repair_square_difference.lean"
+mode = "repair"
+max_rounds = 4
+purpose = "Repair a failed reflexivity attempt with the square-difference strategy"
+reference_proof = "by\n  nlinarith [sq_nonneg (x-y)]"
+
+[[case]]
+id = "negative_square_root_sign"
+path = "cases/27_negative_square_root_sign.lean"
+mode = "negative"
+max_rounds = 3
+purpose = "Must not infer a=b from equal squares without sign assumptions"
+
+[[case]]
+id = "negative_division_zero"
+path = "cases/28_negative_division_zero.lean"
+mode = "negative"
+max_rounds = 3
+purpose = "Must not cancel a denominator without its nonzero assumption"

@@ -1,0 +1,102 @@
+suite = "v3_informal_components"
+version = 1
+# Verdict labels and regex rubrics are scoring-only; never enter model prompts.
+
+[[case]]
+id = "generator_square_nonnegative"
+kind = "generator"
+theorem = "For every real x, prove 0 ≤ x^2."
+concepts = [["nonnegative", "non-negative", "≥ 0", "≥0"], ["square", "product", "x.*x"]]
+
+[[case]]
+id = "generator_square_of_difference"
+kind = "generator"
+theorem = "For real a and b, prove 0 ≤ (a - b)^2."
+concepts = [["a\\s*[-−]\\s*b", "difference"], ["nonnegative", "non-negative", "square"]]
+
+[[case]]
+id = "generator_sum_nonnegative"
+kind = "generator"
+theorem = "For real a and b with ha : 0 ≤ a and hb : 0 ≤ b, prove 0 ≤ a + b."
+concepts = [["sum", "add"], ["nonnegative", "non-negative", "≥ 0", "≥0"]]
+
+[[case]]
+id = "generator_square_difference_strategy"
+kind = "generator"
+theorem = "For real x and y, prove 2*x*y ≤ x^2 + y^2."
+concepts = [["x\\s*[-−]\\s*y", "difference", "AM.?GM", "arithmetic.*geometric"], ["expand", "rearrang", "nonnegative", "non-negative", "square"]]
+
+[[case]]
+id = "generator_sum_of_squares"
+kind = "generator"
+theorem = "For real a and b, prove 0 ≤ a^2 + b^2."
+concepts = [["sum", "add"], ["square", "nonnegative", "non-negative"]]
+
+[[case]]
+id = "verifier_valid_square_difference"
+kind = "verifier"
+theorem = "For real x and y, prove 2*x*y ≤ x^2 + y^2."
+proof = "Since (x-y)^2 ≥ 0, expanding gives x^2 - 2xy + y^2 ≥ 0. Rearranging gives 2xy ≤ x^2+y^2."
+expected = "accept"
+
+[[case]]
+id = "verifier_valid_hypothesis_use"
+kind = "verifier"
+theorem = "For real a and b with h : a = b, prove a^2 = b^2."
+proof = "Substitute b for a using the given equality. Both sides then equal b squared."
+expected = "accept"
+
+[[case]]
+id = "verifier_obvious_false_assumption"
+kind = "verifier"
+theorem = "For every real x, prove 0 ≤ x^2."
+proof = "Since x ≥ 0 for every real number, multiplying x by itself gives x^2 ≥ 0."
+expected = "fail"
+concepts = [["negative", "not.*nonnegative", "not.*non-negative", "assum"]]
+
+[[case]]
+id = "verifier_square_root_sign"
+kind = "verifier"
+theorem = "For real a and b with a^2 = b^2, prove a = b."
+proof = "Since a^2 = b^2, taking square roots gives a = b."
+expected = "fail"
+concepts = [["absolute", "negative", "±", "sign", "-b", "−b", "counterexample"]]
+
+[[case]]
+id = "verifier_missing_nonzero_assumption"
+kind = "verifier"
+theorem = "For arbitrary real x and y, prove (x / y) * y = x. Division by zero is defined to be zero, as in Lean."
+proof = "Cancel y from the denominator and numerator."
+expected = "fail"
+concepts = [["nonzero", "non-zero", "not.*zero", "y.*0", "zero"]]
+
+[[case]]
+id = "verifier_circular_reasoning"
+kind = "verifier"
+theorem = "Prove that the square root of 2 is irrational."
+proof = "Assume the square root of 2 is irrational. Therefore it cannot be written as p/q. Hence the square root of 2 is irrational."
+expected = "fail"
+concepts = [["circular", "assum.*conclusion", "assum.*prove", "begging", "assum.*irrational"]]
+
+[[case]]
+id = "verifier_missing_negative_case"
+kind = "verifier"
+theorem = "For every real x, prove x ≤ |x|."
+proof = "When x is nonnegative, |x| = x, so the desired inequality is equality. This completes the proof for every real x."
+expected = "fail"
+concepts = [["negative", "case", "x.*<.*0"]]
+
+[[case]]
+id = "verifier_rejects_target_mutation"
+kind = "verifier"
+theorem = "For every real x, prove x^2 < 0."
+proof = "Every real square is nonnegative, so x^2 ≥ 0. This proves the theorem."
+expected = "fail"
+concepts = [["opposite", "false", "contradict", "not.*prove", "different", "nonnegative"]]
+
+[[case]]
+id = "refine_square_root_sign_error"
+kind = "refinement"
+theorem = "For real a and b with a^2 = b^2, prove a = b or a = -b."
+proof = "Taking square roots gives a = b. Thus the first disjunct holds."
+concepts = [["factor", "absolute", "sign", "-b", "−b", "negative"]]

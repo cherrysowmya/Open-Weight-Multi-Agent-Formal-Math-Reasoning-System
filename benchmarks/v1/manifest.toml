@@ -1,0 +1,142 @@
+suite = "v1_compiler_guided_loop"
+version = 1
+
+[[case]]
+id = "gen_add_zero"
+path = "cases/01_gen_add_zero.lean"
+mode = "generation"
+max_rounds = 5
+purpose = "Basic hole completion for a right identity"
+
+[[case]]
+id = "gen_zero_add"
+path = "cases/02_gen_zero_add.lean"
+mode = "generation"
+max_rounds = 5
+purpose = "Basic hole completion for a left identity"
+
+[[case]]
+id = "gen_mul_one"
+path = "cases/03_gen_mul_one.lean"
+mode = "generation"
+max_rounds = 5
+purpose = "Basic multiplicative simplification"
+
+[[case]]
+id = "gen_and_swap"
+path = "cases/04_gen_and_swap.lean"
+mode = "generation"
+max_rounds = 5
+purpose = "Propositional decomposition and reconstruction"
+
+[[case]]
+id = "gen_nat_sub_self"
+path = "cases/05_gen_nat_sub_self.lean"
+mode = "generation"
+max_rounds = 5
+purpose = "Mathlib lemma or simplifier selection"
+
+[[case]]
+id = "gen_list_length_nil"
+path = "cases/06_gen_list_length_nil.lean"
+mode = "generation"
+max_rounds = 5
+purpose = "Polymorphic list simplification"
+
+[[case]]
+id = "repair_add_zero_wrong_direction"
+path = "cases/07_repair_add_zero_wrong_direction.lean"
+mode = "repair"
+max_rounds = 5
+purpose = "Type mismatch from choosing zero_add instead of add_zero"
+
+[[case]]
+id = "repair_zero_add_wrong_direction"
+path = "cases/08_repair_zero_add_wrong_direction.lean"
+mode = "repair"
+max_rounds = 5
+purpose = "Type mismatch from choosing add_zero instead of zero_add"
+
+[[case]]
+id = "repair_square_nonnegative"
+path = "cases/09_repair_square_nonnegative.lean"
+mode = "repair"
+max_rounds = 5
+purpose = "Compiler-guided replacement of an insufficient arithmetic tactic"
+
+[[case]]
+id = "repair_and_intro_order"
+path = "cases/10_repair_and_intro_order.lean"
+mode = "repair"
+max_rounds = 5
+purpose = "Constructor arguments supplied in the wrong order"
+
+[[case]]
+id = "repair_existential_witness"
+path = "cases/11_repair_existential_witness.lean"
+mode = "repair"
+max_rounds = 5
+purpose = "Incorrect existential witness and residual equality goal"
+
+[[case]]
+id = "repair_list_append_nil"
+path = "cases/12_repair_list_append_nil.lean"
+mode = "repair"
+max_rounds = 5
+purpose = "Wrong-direction library lemma on a polymorphic type"
+
+[[case]]
+id = "repair_unknown_identifier"
+path = "cases/13_repair_unknown_identifier.lean"
+mode = "repair"
+max_rounds = 5
+purpose = "Unknown Mathlib theorem name propagated into repair context"
+
+[[case]]
+id = "repair_malformed_tactic"
+path = "cases/14_repair_malformed_tactic.lean"
+mode = "repair"
+max_rounds = 5
+purpose = "Lean parser diagnostic propagated into repair context"
+
+[[case]]
+id = "repair_equality_symmetry"
+path = "cases/15_repair_equality_symmetry.lean"
+mode = "repair"
+max_rounds = 5
+purpose = "Hypothesis has the reverse equality orientation"
+
+[[case]]
+id = "already_valid_rfl"
+path = "cases/16_already_valid_rfl.lean"
+mode = "already_valid"
+max_rounds = 3
+purpose = "Valid candidate is accepted without loading Qwen"
+
+[[case]]
+id = "already_valid_positivity"
+path = "cases/17_already_valid_positivity.lean"
+mode = "already_valid"
+max_rounds = 3
+purpose = "Nontrivial valid candidate is accepted without model calls"
+
+[[case]]
+id = "negative_successor_fixed_point"
+path = "cases/18_negative_successor_fixed_point.lean"
+mode = "negative"
+max_rounds = 3
+purpose = "False arithmetic theorem must exhaust the budget"
+
+[[case]]
+id = "negative_irreflexive_lt"
+path = "cases/19_negative_irreflexive_lt.lean"
+mode = "negative"
+max_rounds = 3
+purpose = "False order theorem must never be accepted"
+
+[[case]]
+id = "negative_square_strictly_negative"
+path = "cases/20_negative_square_strictly_negative.lean"
+mode = "negative"
+max_rounds = 3
+purpose = "False real theorem must never be accepted"

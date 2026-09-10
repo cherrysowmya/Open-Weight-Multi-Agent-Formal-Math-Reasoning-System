@@ -1,0 +1,180 @@
+suite = "v2_semantic_retrieval_ablation"
+version = 1
+
+[[case]]
+id = "gen_list_append_nil"
+path = "cases/01_gen_list_append_nil.lean"
+mode = "generation"
+max_rounds = 4
+purpose = "Retrieve a polymorphic right-append identity"
+expected_declarations = ["List.append_nil"]
+reference_proof = "by\n  exact List.append_nil xs"
+
+[[case]]
+id = "gen_list_nil_append"
+path = "cases/02_gen_list_nil_append.lean"
+mode = "generation"
+max_rounds = 4
+purpose = "Distinguish the left-append identity from its converse"
+expected_declarations = ["List.nil_append"]
+reference_proof = "by\n  exact List.nil_append xs"
+
+[[case]]
+id = "gen_list_reverse_reverse"
+path = "cases/03_gen_list_reverse_reverse.lean"
+mode = "generation"
+max_rounds = 4
+purpose = "Find the canonical reverse involution declaration"
+expected_declarations = ["List.reverse_reverse"]
+reference_proof = "by\n  exact List.reverse_reverse xs"
+
+[[case]]
+id = "gen_list_length_reverse"
+path = "cases/04_gen_list_length_reverse.lean"
+mode = "generation"
+max_rounds = 4
+purpose = "Find a list theorem from semantic intent"
+expected_declarations = ["List.length_reverse"]
+reference_proof = "by\n  exact List.length_reverse"
+
+[[case]]
+id = "gen_list_length_append"
+path = "cases/05_gen_list_length_append.lean"
+mode = "generation"
+max_rounds = 4
+purpose = "Retrieve a theorem whose word order is easy to hallucinate"
+expected_declarations = ["List.length_append"]
+reference_proof = "by\n  exact List.length_append"
+
+[[case]]
+id = "gen_set_union_comm"
+path = "cases/06_gen_set_union_comm.lean"
+mode = "generation"
+max_rounds = 4
+purpose = "Retrieve namespace-qualified set union commutativity"
+expected_declarations = ["Set.union_comm"]
+reference_proof = "by\n  exact Set.union_comm s t"
+
+[[case]]
+id = "gen_set_inter_comm"
+path = "cases/07_gen_set_inter_comm.lean"
+mode = "generation"
+max_rounds = 4
+purpose = "Retrieve namespace-qualified set intersection commutativity"
+expected_declarations = ["Set.inter_comm"]
+reference_proof = "by\n  exact Set.inter_comm s t"
+
+[[case]]
+id = "gen_nat_gcd_comm"
+path = "cases/08_gen_nat_gcd_comm.lean"
+mode = "generation"
+max_rounds = 4
+purpose = "Retrieve an arithmetic declaration outside elementary simp goals"
+expected_declarations = ["Nat.gcd_comm"]
+reference_proof = "by\n  exact Nat.gcd_comm a b"
+
+[[case]]
+id = "gen_nat_lcm_comm"
+path = "cases/09_gen_nat_lcm_comm.lean"
+mode = "generation"
+max_rounds = 4
+purpose = "Retrieve the lcm analogue without guessing its name"
+expected_declarations = ["Nat.lcm_comm"]
+reference_proof = "by\n  exact Nat.lcm_comm a b"
+
+[[case]]
+id = "gen_finset_union_comm"
+path = "cases/10_gen_finset_union_comm.lean"
+mode = "generation"
+max_rounds = 4
+purpose = "Disambiguate Finset union from Set union"
+expected_declarations = ["Finset.union_comm"]
+reference_proof = "by\n  exact Finset.union_comm s t"
+
+[[case]]
+id = "repair_list_append_nil"
+path = "cases/11_repair_list_append_nil.lean"
+mode = "repair"
+max_rounds = 4
+purpose = "Repair a valid but wrong-direction list theorem"
+expected_declarations = ["List.append_nil"]
+reference_proof = "by\n  exact List.append_nil xs"
+
+[[case]]
+id = "repair_reverse_unknown"
+path = "cases/12_repair_reverse_unknown.lean"
+mode = "repair"
+max_rounds = 4
+purpose = "Replace an invented reverse-involution identifier"
+expected_declarations = ["List.reverse_reverse"]
+reference_proof = "by\n  exact List.reverse_reverse xs"
+
+[[case]]
+id = "repair_length_append_unknown"
+path = "cases/13_repair_length_append_unknown.lean"
+mode = "repair"
+max_rounds = 4
+purpose = "Replace a plausible word-order hallucination"
+expected_declarations = ["List.length_append"]
+reference_proof = "by\n  exact List.length_append"
+
+[[case]]
+id = "repair_set_union_unknown"
+path = "cases/14_repair_set_union_unknown.lean"
+mode = "repair"
+max_rounds = 4
+purpose = "Replace an invented commutativity spelling"
+expected_declarations = ["Set.union_comm"]
+reference_proof = "by\n  exact Set.union_comm s t"
+
+[[case]]
+id = "repair_nat_gcd_unknown"
+path = "cases/15_repair_nat_gcd_unknown.lean"
+mode = "repair"
+max_rounds = 4
+purpose = "Replace an invented gcd theorem name"
+expected_declarations = ["Nat.gcd_comm"]
+reference_proof = "by\n  exact Nat.gcd_comm a b"
+
+[[case]]
+id = "repair_abs_nonneg_unknown"
+path = "cases/16_repair_abs_nonneg_unknown.lean"
+mode = "repair"
+max_rounds = 4
+purpose = "Find the actual nonnegativity declaration for absolute value"
+expected_declarations = ["abs_nonneg"]
+reference_proof = "by\n  exact abs_nonneg x"
+
+[[case]]
+id = "repair_set_union_empty"
+path = "cases/17_repair_set_union_empty.lean"
+mode = "repair"
+max_rounds = 4
+purpose = "Choose the correct orientation of an empty-set union theorem"
+expected_declarations = ["Set.union_empty"]
+reference_proof = "by\n  exact Set.union_empty s"
+
+[[case]]
+id = "repair_function_comp_id"
+path = "cases/18_repair_function_comp_id.lean"
+mode = "repair"
+max_rounds = 4
+purpose = "Replace an invented function composition identity name"
+expected_declarations = ["Function.comp_id"]
+reference_proof = "by\n  exact Function.comp_id f"
+
+[[case]]
+id = "negative_nat_successor"
+path = "cases/19_negative_nat_successor.lean"
+mode = "negative"
+max_rounds = 3
+purpose = "Retrieval must not turn a false theorem into a false positive"
+expected_declarations = []
+
+[[case]]
+id = "negative_union_inter"
+path = "cases/20_negative_union_inter.lean"
+mode = "negative"
+max_rounds = 3
+purpose = "Retrieved related declarations remain suggestions, never authority"
+expected_declarations = []

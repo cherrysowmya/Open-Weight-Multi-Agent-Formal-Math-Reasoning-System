@@ -1,0 +1,25 @@
+suite = "v4_context_ablation"
+version = 1
+
+[[case]]
+id = "hypothesis_chain"
+path = "cases/hypothesis_chain.lean"
+mode = "generation"
+max_rounds = 3
+purpose = "Use local hypotheses across two conjunctive goals."
+reference_proof = "by exact ⟨fun hp => g (f hp), fun hp => ⟨f hp, g (f hp)⟩⟩"
+
+[[case]]
+id = "square_bound"
+path = "cases/square_bound.lean"
+mode = "repair"
+max_rounds = 4
+purpose = "Repair an incomplete nonlinear argument while preserving the interval hypothesis."
+reference_proof = "by constructor <;> nlinarith [sq_nonneg x, mul_nonneg hx (sub_nonneg.mpr hx1)]"
+
+[[case]]
+id = "false_successor"
+path = "cases/false_successor.lean"
+mode = "negative"
+max_rounds = 3
+purpose = "Discussion and isolated contexts cannot make a false successor equality valid."

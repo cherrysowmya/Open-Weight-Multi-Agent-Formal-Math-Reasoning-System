@@ -1,0 +1,160 @@
+suite = "v3_informal_reasoning_ablation"
+version = 1
+
+[[case]]
+id = "gen_implication_chain"
+path = "cases/01_gen_implication_chain.lean"
+mode = "generation"
+max_rounds = 4
+purpose = "Plan a short composition of two implications"
+reference_proof = "by\n  intro hP\n  exact hQR (hPQ hP)"
+
+[[case]]
+id = "gen_conjunction_reassociate"
+path = "cases/02_gen_conjunction_reassociate.lean"
+mode = "generation"
+max_rounds = 4
+purpose = "Decompose and rebuild nested conjunctions"
+reference_proof = "by\n  exact ⟨h.1.1, h.1.2, h.2⟩"
+
+[[case]]
+id = "gen_de_morgan_forward"
+path = "cases/03_gen_de_morgan_forward.lean"
+mode = "generation"
+max_rounds = 4
+purpose = "Track negated disjunction assumptions without circularity"
+reference_proof = "by\n  constructor\n  · intro hP\n    exact h (Or.inl hP)\n  · intro hQ\n    exact h (Or.inr hQ)"
+
+[[case]]
+id = "gen_injective_composition"
+path = "cases/04_gen_injective_composition.lean"
+mode = "generation"
+max_rounds = 4
+purpose = "Apply injectivity hypotheses in the mathematically correct order"
+reference_proof = "by\n  intro x y hxy\n  exact hf (hg hxy)"
+
+[[case]]
+id = "gen_subset_transitivity"
+path = "cases/05_gen_subset_transitivity.lean"
+mode = "generation"
+max_rounds = 4
+purpose = "Compose elementwise subset arguments"
+reference_proof = "by\n  intro x hx\n  exact htu (hst hx)"
+
+[[case]]
+id = "gen_inter_union_distrib"
+path = "cases/06_gen_inter_union_distrib.lean"
+mode = "generation"
+max_rounds = 4
+purpose = "Plan both directions of a set distributivity equality"
+reference_proof = "by\n  ext x\n  simp [and_or_left]"
+
+[[case]]
+id = "gen_square_plus_one_positive"
+path = "cases/07_gen_square_plus_one_positive.lean"
+mode = "generation"
+max_rounds = 4
+purpose = "Recognize a nonlinear positivity argument"
+reference_proof = "by\n  nlinarith [sq_nonneg x]"
+
+[[case]]
+id = "gen_absolute_triangle"
+path = "cases/08_gen_absolute_triangle.lean"
+mode = "generation"
+max_rounds = 4
+purpose = "Connect the mathematical triangle inequality to a formal proof"
+reference_proof = "by\n  exact abs_add_le x y"
+
+[[case]]
+id = "gen_divisibility_transitivity"
+path = "cases/09_gen_divisibility_transitivity.lean"
+mode = "generation"
+max_rounds = 4
+purpose = "Compose divisibility witnesses in the right direction"
+reference_proof = "by\n  exact dvd_trans hab hbc"
+
+[[case]]
+id = "gen_reverse_append"
+path = "cases/10_gen_reverse_append.lean"
+mode = "generation"
+max_rounds = 4
+purpose = "Plan the reversed order created by reversing an append"
+reference_proof = "by\n  exact List.reverse_append"
+
+[[case]]
+id = "repair_conjunction_swap"
+path = "cases/11_repair_conjunction_swap.lean"
+mode = "repair"
+max_rounds = 4
+purpose = "Repair a structural proof that preserves the wrong component order"
+reference_proof = "by\n  exact ⟨h.2, h.1⟩"
+
+[[case]]
+id = "repair_implication_order"
+path = "cases/12_repair_implication_order.lean"
+mode = "repair"
+max_rounds = 4
+purpose = "Repair implications applied in an invalid order"
+reference_proof = "by\n  intro hP\n  exact hQR (hPQ hP)"
+
+[[case]]
+id = "repair_injective_order"
+path = "cases/13_repair_injective_order.lean"
+mode = "repair"
+max_rounds = 4
+purpose = "Repair reversed use of two injectivity hypotheses"
+reference_proof = "by\n  intro x y hxy\n  exact hf (hg hxy)"
+
+[[case]]
+id = "repair_nonlinear_positivity"
+path = "cases/14_repair_nonlinear_positivity.lean"
+mode = "repair"
+max_rounds = 4
+purpose = "Replace an unsuitable linear tactic with a nonlinear sign argument"
+reference_proof = "by\n  positivity"
+
+[[case]]
+id = "repair_set_distributivity"
+path = "cases/15_repair_set_distributivity.lean"
+mode = "repair"
+max_rounds = 4
+purpose = "Replace definitional reflexivity with an extensional set proof"
+reference_proof = "by\n  ext x\n  simp [and_or_left]"
+
+[[case]]
+id = "repair_divisibility_order"
+path = "cases/16_repair_divisibility_order.lean"
+mode = "repair"
+max_rounds = 4
+purpose = "Repair reversed composition of divisibility evidence"
+reference_proof = "by\n  exact dvd_trans hab hbc"
+
+[[case]]
+id = "repair_polynomial_identity"
+path = "cases/17_repair_polynomial_identity.lean"
+mode = "repair"
+max_rounds = 4
+purpose = "Replace definitional reflexivity with polynomial normalization"
+reference_proof = "by\n  ring"
+
+[[case]]
+id = "repair_reverse_append"
+path = "cases/18_repair_reverse_append.lean"
+mode = "repair"
+max_rounds = 4
+purpose = "Repair a false definitional-equality assumption using list structure"
+reference_proof = "by\n  exact List.reverse_append"
+
+[[case]]
+id = "negative_arbitrary_implication"
+path = "cases/19_negative_arbitrary_implication.lean"
+mode = "negative"
+max_rounds = 3
+purpose = "An informal verifier must not authorize an invalid implication"
+
+[[case]]
+id = "negative_square_negative"
+path = "cases/20_negative_square_negative.lean"
+mode = "negative"
+max_rounds = 3
+purpose = "Informal reasoning must not override Lean on an impossible sign claim"

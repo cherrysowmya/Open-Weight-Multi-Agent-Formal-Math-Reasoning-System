@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=75"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "local-lean-agent"
+version = "0.4.0"
+description = "A fully local, compiler-guided Lean 4 theorem-proving agent for Apple Silicon"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "Local Lean Agent contributors" }]
+dependencies = []
+
+[project.optional-dependencies]
+mlx = ["mlx-lm==0.31.3"]
+dev = []
+
+[project.scripts]
+local-lean-agent = "local_lean_agent.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]

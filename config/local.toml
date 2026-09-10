@@ -1,0 +1,96 @@
+[mlx]
+model_id = "mlx-community/Qwen3-8B-4bit"
+base_url = "http://127.0.0.1:8080/v1"
+managed_server = true
+startup_timeout_seconds = 600.0
+request_timeout_seconds = 300.0
+# Passed directly to `python -m mlx_lm.server`.
+extra_server_args = ["--max-tokens", "2048", "--prompt-cache-size", "2"]
+
+[generation]
+max_context_tokens = 12288
+max_output_tokens = 512
+temperature = 0.0
+top_p = 0.95
+enable_thinking = false
+
+[kimina]
+base_url = "http://127.0.0.1:8000"
+endpoint = "/api/check"
+health_endpoint = "/health"
+request_timeout_seconds = 90.0
+lean_timeout_seconds = 60
+reuse_repl = true
+
+[lean_lsp]
+enabled = true
+required = true
+command = "../services/lean-lsp-mcp/.venv/bin/lean-lsp-mcp"
+args = []
+project_path = "../services/kimina-lean-server/mathlib4"
+request_timeout_seconds = 360.0
+max_feedback_chars = 8000
+
+[lean_explore]
+enabled = true
+required = true
+command = "../services/lean-explore/.venv/bin/lean-explore"
+args = ["mcp", "serve", "--backend", "local"]
+cache_dir = "../services/lean-explore/cache"
+hf_cache_dir = "../services/lean-explore/huggingface"
+data_version = "20260714_172516"
+limit = 8
+source_limit = 5
+# The local hybrid search still uses BM25 + embeddings. Zero disables only the
+# heavier cross-encoder reranking stage for the 32 GB Mac baseline.
+rerank_top = 0
+packages = ["Mathlib", "Init"]
+request_timeout_seconds = 600.0
+max_query_chars = 4000
+max_context_chars = 12000
+embedding_batch_size = 1
+reranker_batch_size = 1
+
+[informal_reasoning]
+enabled = true
+verifier_enabled = true
+invocation_policy = "after_model_failures"
+trigger_after_failures = 1
+max_refinement_rounds = 3
+max_context_tokens = 8192
+max_output_tokens = 1536
+generator_temperature = 0.3
+verifier_temperature = 0.0
+top_p = 0.95
+max_packet_chars = 12000
+max_proof_chars = 6000
+max_critique_chars = 4000
+strategy_retrieval_enabled = true
+strategy_query_limit = 2
+strategy_query_max_chars = 240
+rewrite_recovery_enabled = true
+rewrite_salvage_tactics = ["nlinarith", "linarith", "omega", "simp_all"]
+rewrite_salvage_enabled = true
+rewrite_salvage_max_checks = 8
+
+[v4]
+enabled = true
+discussion_enabled = true
+fresh_context_enabled = true
+compression_enabled = true
+trigger_after_failures = 2
+max_discussion_calls = 1
+max_fresh_calls = 1
+max_context_tokens = 8192
+discussion_max_output_tokens = 1536
+fresh_max_output_tokens = 512
+summary_max_chars = 2400
+
+[agent]
+max_rounds = 5
+unload_model_after_attempt = true
+diagnostics_max_chars = 8000
+fallback_enabled = true
+fallback_tactics = ["rfl", "simp", "norm_num", "omega", "positivity", "aesop"]
+log_path = "../runs/attempts.jsonl"
+result_dir = "../runs/results"

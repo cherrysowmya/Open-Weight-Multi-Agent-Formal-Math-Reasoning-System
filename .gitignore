@@ -1,0 +1,19 @@
+.DS_Store
+.venv/
+services/lean-lsp-mcp/
+services/lean-explore/
+services/kimina-lean-server/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+runs/*
+!runs/.gitkeep
+
+# Local secrets and downloaded model weights.
+.env
+.env.*
+!.env.example
+*.safetensors
+*.gguf

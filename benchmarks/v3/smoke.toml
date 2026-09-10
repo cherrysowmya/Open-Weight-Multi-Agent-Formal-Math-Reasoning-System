@@ -1,0 +1,18 @@
+suite = "v3_informal_reasoning_ablation"
+version = 1
+# Integration smoke only: not a representative evaluation dataset.
+
+[[case]]
+id = "gen_implication_chain"
+path = "cases/01_gen_implication_chain.lean"
+mode = "generation"
+max_rounds = 3
+purpose = "Exercise generator, independent verifier, then formal Lean verification"
+reference_proof = "by\n  intro hP\n  exact hQR (hPQ hP)"
+
+[[case]]
+id = "negative_arbitrary_implication"
+path = "cases/19_negative_arbitrary_implication.lean"
+mode = "negative"
+max_rounds = 2
+purpose = "Informal verdicts must not create false positives"
