@@ -11,7 +11,7 @@ import sys
 import time
 
 from .backends.mlx import MLXBackend
-from .config import AppConfig, load_config
+from .config import AppConfig, _validate, load_config
 from .feedback.lean_lsp_mcp import LeanLSPMCPClient
 from .informal.qwen import QwenInformalReasoner
 from .orchestrator import ProofAgent
@@ -60,6 +60,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     solve.add_argument("--v4", choices=("on", "off"), default=None,
                        help="Enable or disable V4 discussion and fresh contexts")
+    _formal_output_arguments(solve)
 
     check = subparsers.add_parser("check", help="Check a Lean file with Kimina")
     check.add_argument("input", type=Path)
@@ -166,7 +167,8 @@ def build_parser() -> argparse.ArgumentParser:
         benchmark.add_argument("--case", action="append", default=[], help="Explicit problem ID; overrides --limit")
         benchmark.add_argument("--output", type=Path, default=Path("runs/" + command + "-latest.json"))
         if command.endswith("run"):
-            benchmark.add_argument("--variant", action="append", choices=("lean", "v2", "v3", "v4"),
+            _formal_output_arguments(benchmark)
+            benchmark.add_argument("--variant", action="append", choices=("lean", "v2", "v3", "v4", "portfolio", "v4_portfolio"),
                                    help="Repeat for paired conditions; default v4")
             benchmark.add_argument("--max-rounds", type=_positive_int, default=3)
             benchmark.add_argument("--attempts", type=_positive_int, default=1)
@@ -176,10 +178,35 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _formal_output_arguments(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("--proof-format", choices=("full_file", "proof_body"),
+                        help="Return whole files (control) or deterministically assembled proof bodies")
+    parser.add_argument("--formal-output-policy", choices=("legacy", "fixed", "adaptive"),
+                        help="Override formal output recovery; legacy preserves the old policy")
+    parser.add_argument("--formal-output-tokens", type=int, choices=(512, 1024, 2048),
+                        help="Fixed or initial adaptive output allowance for formal requests")
+    parser.add_argument("--formal-output-ceiling", type=int, choices=(512, 1024, 2048),
+                        help="Maximum adaptive formal output allowance")
+
+
+def _output_budget_overrides(config: AppConfig, args: argparse.Namespace) -> AppConfig:
+    values = {key: getattr(args, arg, None) for key, arg in (
+        ("proof_format", "proof_format"),
+        ("output_budget_policy", "formal_output_policy"),
+        ("max_output_tokens", "formal_output_tokens"),
+        ("max_recovery_output_tokens", "formal_output_ceiling"))}
+    values = {key: value for key, value in values.items() if value is not None}
+    if values:
+        config = replace(config, generation=replace(config.generation, **values))
+        _validate(config)
+    return config
+
+
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     try:
         config = load_config(args.config)
+        config = _output_budget_overrides(config, args)
         if args.command.startswith("minif2f-"):
             from .minif2f import load_dataset, prepare_dataset, select_cases
             from .benchmark import run_benchmark, validate_dataset

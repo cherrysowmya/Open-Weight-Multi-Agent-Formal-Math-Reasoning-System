@@ -15,7 +15,11 @@ from .contexts import (DISCUSSION_SYSTEM, FRESH_INSTRUCTION, PacketBudgetError,
     TaskPacket, conservative_tokens, parse_discussion, prepare_request, summarize_failures)
 from .feedback.base import LeanFeedbackProvider
 from .informal.base import InformalReasoner
+from .output_budget import (RECOVERY_INSTRUCTION, choose_output_budget,
+                            output_status, repetitive_output)
 from .prompts import SYSTEM_PROMPT, initial_prompt, repair_prompt, reset_repair_prompt, rewrite_repair_prompt
+from .proof_body import BODY_CONTRACT, ProofSlot, ProofSlotError, body_prompt, target_assignment
+from .portfolio import try_portfolio
 from .retrieval.base import SemanticRetriever
 from .telemetry import JSONLTelemetry
 from .types import (
@@ -76,9 +80,12 @@ class ProofAgent:
         stop_reason = "iteration_budget"
         error_message: str | None = None
         model_loaded = False
+        proof_slot = None
         self.telemetry.emit("attempt_started", attempt_id, {"theorem": theorem})
 
         try:
+            if self.config.generation.proof_format == "proof_body":
+                proof_slot = ProofSlot.from_source(theorem)
             should_generate = True
             if has_concrete_proof_candidate(theorem):
                 candidate = theorem
@@ -229,6 +236,14 @@ class ProofAgent:
                         packet = replace(packet, discussion=advice)
                 if v4.enabled and discussion:
                     informal_guidance += "\nDiscussion partner advice (unverified):\n" + discussion
+                previous = records[-1] if records else None
+                repetitive = bool(candidate and (is_degenerate_candidate(candidate)
+                    or candidate_repeats_rejected_attempt(records)))
+                if self.config.generation.output_budget_policy != "legacy":
+                    repetitive = repetitive or repetitive_output(candidate)
+                budget_decision = choose_output_budget(self.config.generation, previous,
+                                                       repetitive=repetitive)
+                reset_context = budget_decision.reset
                 if not candidate:
                     repair_action = "initial"
                     prompt = initial_prompt(
@@ -239,11 +254,6 @@ class ProofAgent:
                     diagnostics = "\n".join(previous.verification.diagnostics)[
                         : self.config.agent.diagnostics_max_chars
                     ]
-                    reset_context = (
-                        previous.generation.finish_reason == "length"
-                        or is_degenerate_candidate(candidate)
-                        or candidate_repeats_rejected_attempt(records)
-                    )
                     lean_lsp_feedback = render_lean_feedback(previous.lean_feedback)
                     rejected_history = render_rejected_history(records)
                     prompt = (
@@ -270,6 +280,7 @@ class ProofAgent:
                     repair_action = "fresh_reset" if reset_context else "repair"
                     if (self.config.informal_reasoning.enabled
                         and self.config.informal_reasoning.rewrite_recovery_enabled
+                        and budget_decision.action not in {"expand_truncated", "retry_at_ceiling"}
                         and has_rewrite_failure(previous.verification.diagnostics)):
                         prompt = rewrite_repair_prompt(
                             task_skeleton(theorem), diagnostics, lean_lsp_feedback,
@@ -282,24 +293,36 @@ class ProofAgent:
                             "iteration": iteration, "action": repair_action,
                             "reason": "Lean rejected a rewrite argument or could not find its pattern",
                         })
+                output_recovery = budget_decision.action in {"expand_truncated", "retry_at_ceiling"}
+                if output_recovery:
+                    prompt += RECOVERY_INSTRUCTION
+                    repair_action = "output_budget_recovery"
+                formal_system = SYSTEM_PROMPT
+                if proof_slot is not None:
+                    formal_system = body_prompt(formal_system) + BODY_CONTRACT
+                    prompt = body_prompt(prompt)
                 messages = [
-                    ChatMessage("system", SYSTEM_PROMPT),
+                    ChatMessage("system", formal_system),
                     ChatMessage("user", prompt),
                 ]
                 fresh = (v4.enabled and v4.fresh_context_enabled
                     and metrics.fresh_subproblem_calls < v4.max_fresh_calls
                     and failures >= v4.trigger_after_failures * (metrics.fresh_subproblem_calls + 1))
                 request_record = None
-                output_limit = (min(v4.fresh_max_output_tokens, self.config.generation.max_output_tokens)
-                                if fresh else self.config.generation.max_output_tokens)
-                if reset_context:
-                    output_limit = min(512, output_limit)
+                budget_decision = choose_output_budget(self.config.generation, previous,
+                    repetitive=repetitive, fresh=fresh, fresh_limit=v4.fresh_max_output_tokens)
+                output_limit = budget_decision.tokens
+                if reset_context and self.config.generation.output_budget_policy == "legacy":
+                    output_limit = min(self.config.generation.reset_output_tokens, output_limit)
                 if v4.enabled:
                     context_size = conservative_tokens(tuple(messages))
                     if fresh or (v4.compression_enabled and context_size + output_limit > self.config.generation.max_context_tokens):
                         try:
                             request_record = prepare_request(packet,
-                                system=SYSTEM_PROMPT + "\n" + FRESH_INSTRUCTION,
+                                system=formal_system + "\n"
+                                    + (body_prompt(FRESH_INSTRUCTION) if proof_slot else FRESH_INSTRUCTION)
+                                    + ((body_prompt(RECOVERY_INSTRUCTION) if proof_slot else RECOVERY_INSTRUCTION)
+                                       if output_recovery else ""),
                                 role="fresh_subproblem" if fresh else "main_compressed",
                                 iteration=iteration, context_limit=(v4.max_context_tokens if fresh
                                     else self.config.generation.max_context_tokens),
@@ -318,13 +341,27 @@ class ProofAgent:
                     metrics.v4_context_sizes.append(context_size)
                     self.telemetry.emit("v4_request_started", attempt_id, request_record)
                 else:
-                    context_size = estimate_message_tokens(messages)
+                    context_size = (estimate_message_tokens(messages)
+                        if self.config.generation.output_budget_policy == "legacy"
+                        else conservative_tokens(tuple(messages)))
                 if context_size + output_limit > self.config.generation.max_context_tokens:
                     raise ContextBudgetError(
                         f"Estimated request ({context_size} input + "
                         f"{output_limit} output tokens) exceeds "
                         f"the {self.config.generation.max_context_tokens}-token limit"
                     )
+                budget_request = {
+                    "iteration": iteration, "policy": self.config.generation.output_budget_policy,
+                    "proof_format": self.config.generation.proof_format,
+                    "action": budget_decision.action, "previous_status": budget_decision.previous_status,
+                    "role": "fresh_subproblem" if fresh else "main",
+                    "requested_output_tokens": output_limit, "estimated_input_tokens": context_size,
+                    "context_limit": min(v4.max_context_tokens, self.config.generation.max_context_tokens)
+                        if fresh else self.config.generation.max_context_tokens,
+                }
+                metrics.formal_output_budget_requests.append(budget_request)
+                metrics.formal_output_budget_increases += int(budget_decision.action == "expand_truncated")
+                self.telemetry.emit("formal_output_budget_selected", attempt_id, budget_request)
                 metrics.formal_call_attempts += 1
                 if fresh:
                     metrics.fresh_subproblem_calls += 1
@@ -353,7 +390,22 @@ class ProofAgent:
                     generation.usage.prompt_tokens or context_size
                 )
                 candidate = extract_lean_code(generation.text)
-                integrity_error = validate_task_preserved(theorem, candidate)
+                integrity_error = None
+                proof_body_normalization = None
+                if proof_slot is not None:
+                    try:
+                        candidate, proof_body_normalization = proof_slot.assemble_response(candidate)
+                    except ValueError as exc:
+                        proof_body_normalization = "rejected"
+                        integrity_error = str(exc)
+                        # Keep a task-preserving failed candidate for diagnostics;
+                        # the rejected raw response remains in generation.text.
+                        candidate = theorem
+                    self.telemetry.emit("proof_body_response_normalized", attempt_id, {
+                        "iteration": iteration, "action": proof_body_normalization,
+                        "error": integrity_error,
+                    })
+                integrity_error = integrity_error or validate_task_preserved(theorem, candidate)
                 if integrity_error:
                     lean_feedback = None
                     verification = VerificationResult(
@@ -386,6 +438,11 @@ class ProofAgent:
                     )
                 metrics.iterations = iteration
                 last_failure = verification.failure_category
+                repeated_output = (is_degenerate_candidate(candidate) or repetitive_output(candidate)
+                                   or find_rejected_duplicate(records, candidate) is not None)
+                generation_status = output_status(generation.finish_reason, repeated_output)
+                metrics.formal_output_truncations += int(generation.finish_reason == "length")
+                metrics.formal_output_repetitions += int(repeated_output)
                 record = IterationRecord(
                     iteration=iteration,
                     candidate=candidate,
@@ -396,6 +453,10 @@ class ProofAgent:
                     retrieval=retrieval,
                     strategy_retrieval=strategy_retrieval,
                     repair_action=repair_action,
+                    requested_output_tokens=output_limit,
+                    output_status=generation_status,
+                    output_budget_action=budget_decision.action,
+                    proof_body_normalization=proof_body_normalization,
                 )
                 records.append(record)
                 metrics.memory_samples_mb.append(
@@ -492,6 +553,11 @@ class ProofAgent:
                         else "Lean verifier became unavailable during fallback checking"
                     )
                     break
+        except ProofSlotError as exc:
+            last_failure = FailureCategory.TASK_MUTATION
+            stop_reason = "unsupported_proof_slot"
+            error_message = str(exc)
+            self.telemetry.emit("attempt_error", attempt_id, {"error": str(exc)})
         except ContextBudgetError as exc:
             last_failure = FailureCategory.CONTEXT_BUDGET
             stop_reason = "context_budget"
@@ -711,29 +777,9 @@ class ProofAgent:
     ) -> tuple[str, VerificationResult] | None:
         if not self.config.agent.fallback_enabled:
             return None
-        for tactic in self.config.agent.fallback_tactics:
-            candidate = replace_target_proof(theorem, f"by\n  {tactic}")
-            fingerprint = strategy_fingerprint(candidate)
-            if fingerprint in attempted:
-                continue
-            attempted.add(fingerprint)
-            verification = self.verifier.verify(
-                candidate,
-                attempt_id=f"{attempt_id}-{iteration}-fallback-{len(attempts) + 1}",
-            )
-            metrics.kimina_checks += 1
-            metrics.fallback_checks += 1
-            fallback_attempt = FallbackAttempt(tactic, candidate, verification)
-            attempts.append(fallback_attempt)
-            self.telemetry.emit(
-                "fallback_candidate_checked", attempt_id, fallback_attempt
-            )
-            if (
-                verification.valid
-                or verification.failure_category == FailureCategory.VERIFIER_UNAVAILABLE
-            ):
-                return candidate, verification
-        return None
+        return try_portfolio(theorem, verifier=self.verifier, config=self.config,
+                             attempt_id=f"{attempt_id}-{iteration}", metrics=metrics,
+                             attempts=attempts, attempted=attempted, telemetry=self.telemetry)
 
     def _try_rewrite_prefix_salvage(
         self,
@@ -1210,13 +1256,7 @@ def replace_target_proof(theorem: str, proof: str) -> str:
 
 
 def _target_assignment_index(code: str) -> int | None:
-    declarations = list(
-        re.finditer(r"(?m)^[ \t]*(?:theorem|lemma|example)\b", code)
-    )
-    if not declarations:
-        return None
-    assignment = code.find(":=", declarations[-1].start())
-    return None if assignment < 0 else assignment
+    return target_assignment(code)
 
 
 def _memory_sample(

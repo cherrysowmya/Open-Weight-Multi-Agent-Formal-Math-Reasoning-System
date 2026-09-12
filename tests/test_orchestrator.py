@@ -464,7 +464,7 @@ class OrchestratorTests(unittest.TestCase):
                 return True
 
             def verify(self, code: str, *, attempt_id: str) -> VerificationResult:
-                if code.rstrip().endswith("by\n  simp"):
+                if code.rstrip().endswith("by\n    simp"):
                     return VerificationResult(valid=True)
                 return VerificationResult(
                     valid=False,
@@ -490,7 +490,7 @@ class OrchestratorTests(unittest.TestCase):
         self.assertEqual(result.metrics.kimina_checks, 3)
         self.assertEqual(len(result.fallback_attempts), 2)
         self.assertEqual(result.iterations[-1].generation.model, "v1_1_fallback")
-        self.assertTrue(result.final_proof.rstrip().endswith("by\n  simp"))
+        self.assertTrue(result.final_proof.rstrip().endswith("by\n    simp"))
 
     def test_fallback_portfolio_is_attempted_only_once_for_false_theorem(self) -> None:
         backend = FakeBackend(

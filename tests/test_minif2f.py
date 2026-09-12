@@ -156,6 +156,47 @@ class MiniF2FRunnerTests(unittest.TestCase):
         self.backend.unload_model.assert_called_once()
         self.feedback.close.assert_called_once()
 
+    def test_portfolio_variants_are_explicit_and_leave_v4_control_unchanged(self):
+        portfolio = variant_config(self.config, "portfolio", 3)
+        combined = variant_config(self.config, "v4_portfolio", 3)
+        control = variant_config(self.config, "v4", 3)
+        self.assertFalse(portfolio.lean_explore.enabled)
+        self.assertFalse(portfolio.informal_reasoning.enabled)
+        self.assertFalse(portfolio.v4.enabled)
+        self.assertTrue(portfolio.agent.fallback_enabled)
+        self.assertEqual(replace(combined, agent=replace(combined.agent, fallback_enabled=False)), control)
+        self.assertEqual(portfolio.agent.fallback_tactics, combined.agent.fallback_tactics)
+
+    def test_portfolio_only_never_initializes_model_or_lsp_and_audits_success(self):
+        with patch("local_lean_agent.benchmark.MLXBackend") as backend_factory, \
+             patch("local_lean_agent.benchmark.LeanLSPMCPClient") as lsp_factory, \
+             patch("local_lean_agent.benchmark.LeanExploreMCPClient") as retrieval_factory:
+            result = run_benchmark(self.config, data=DATA, split="valid", output=self.output,
+                                   variants=("portfolio",), ids=("first",))
+        backend_factory.assert_not_called()
+        lsp_factory.assert_not_called()
+        retrieval_factory.assert_not_called()
+        self.agent.solve.assert_not_called()
+        self.audit.verify.assert_called_once()
+        summary = result["summary"]["portfolio"]
+        self.assertEqual(summary["all_model_calls"], 0)
+        self.assertEqual(summary["portfolio_checks"], 1)
+        self.assertEqual(summary["portfolio_verified_problems"], 1)
+        self.assertEqual(summary["portfolio_tactic_successes"], {"rfl": 1})
+
+    def test_portfolio_audit_failure_not_credited_to_tactics(self):
+        self.audit.verify.return_value = VerificationResult(False)
+        result = run_benchmark(self.config, data=DATA, split="valid", output=self.output,
+                               variants=("portfolio",), ids=("first",))
+        self.assertEqual(result["summary"]["portfolio"]["portfolio_verified_problems"], 0)
+        self.assertEqual(result["summary"]["portfolio"]["portfolio_tactic_successes"], {})
+
+    def test_proof_format_is_config_fingerprinted_and_cannot_change_on_resume(self):
+        self.run_benchmark()
+        self.config = replace(self.config, generation=replace(self.config.generation, proof_format="proof_body"))
+        with self.assertRaisesRegex(ValueError, "Resume rejected"):
+            self.run_benchmark(resume=True)
+
     def test_audit_failure_cannot_count_as_success(self):
         self.audit.verify.return_value = VerificationResult(False, failure_category=FailureCategory.UNSAFE_PLACEHOLDER)
         result = self.run_benchmark()
@@ -255,6 +296,23 @@ class MiniF2FRunnerTests(unittest.TestCase):
     def test_nonfinite_budget_rejected(self):
         with self.assertRaises(ValueError):
             self.run_benchmark(max_seconds=float("nan"))
+
+    def test_output_policy_is_fingerprinted_and_cannot_change_on_resume(self):
+        self.config = replace(self.config, generation=replace(self.config.generation,
+            output_budget_policy="adaptive", max_output_tokens=512, max_recovery_output_tokens=2048))
+        result = self.run_benchmark()
+        self.assertEqual(result["spec"]["effective_configs"]["lean"]["generation"]["output_budget_policy"], "adaptive")
+        self.config = replace(self.config, generation=replace(self.config.generation, output_budget_policy="fixed"))
+        with self.assertRaisesRegex(ValueError, "Resume rejected"):
+            self.run_benchmark(resume=True)
+
+    def test_output_budget_telemetry_is_in_benchmark_summary(self):
+        self.agent.solve.side_effect = lambda source: replace(solved(source), metrics=AttemptMetrics(
+            formal_output_truncations=2, formal_output_repetitions=1, formal_output_budget_increases=1))
+        summary = self.run_benchmark()["summary"]["lean"]
+        self.assertEqual(summary["formal_output_truncations"], 4)
+        self.assertEqual(summary["formal_output_repetitions"], 2)
+        self.assertEqual(summary["formal_output_budget_increases"], 2)
 
 
 @unittest.skipUnless(os.environ.get("RUN_MINIF2F_LEAN_TESTS") == "1", "requires local Kimina")

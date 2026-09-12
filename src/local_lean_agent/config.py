@@ -25,6 +25,10 @@ class GenerationConfig:
     temperature: float = 0.2
     top_p: float = 0.95
     enable_thinking: bool = False
+    output_budget_policy: str = "legacy"
+    max_recovery_output_tokens: int = 2048
+    reset_output_tokens: int = 512
+    proof_format: str = "full_file"
 
 
 @dataclass(frozen=True, slots=True)
@@ -233,6 +237,25 @@ def load_config(path: str | Path | None = None) -> AppConfig:
 
 
 def _validate(config: AppConfig) -> None:
+    generation = config.generation
+    if generation.proof_format not in {"full_file", "proof_body"}:
+        raise ValueError("proof_format must be full_file or proof_body")
+    if generation.output_budget_policy not in {"legacy", "fixed", "adaptive"}:
+        raise ValueError("output_budget_policy must be legacy, fixed or adaptive")
+    for value in (generation.max_output_tokens, generation.max_recovery_output_tokens,
+                  generation.reset_output_tokens):
+        if type(value) is not int or value <= 0:
+            raise ValueError("Formal output budgets must be positive integers")
+    if generation.output_budget_policy == "adaptive":
+        if generation.max_recovery_output_tokens < generation.max_output_tokens:
+            raise ValueError("max_recovery_output_tokens must be at least max_output_tokens")
+    effective_max = (generation.max_recovery_output_tokens
+                     if generation.output_budget_policy == "adaptive" else generation.max_output_tokens)
+    if effective_max >= generation.max_context_tokens:
+        raise ValueError("Formal output budget must leave room for the main prompt")
+    if (config.v4.enabled and generation.output_budget_policy != "legacy"
+            and effective_max >= config.v4.max_context_tokens):
+        raise ValueError("Formal output budget must leave room for the isolated prompt")
     v4 = config.v4
     if not 1 <= v4.trigger_after_failures <= 20:
         raise ValueError("V4 trigger_after_failures must be between 1 and 20")

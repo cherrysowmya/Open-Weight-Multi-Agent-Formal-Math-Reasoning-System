@@ -19,6 +19,7 @@ from .feedback.lean_lsp_mcp import LeanLSPMCPClient
 from .informal.qwen import QwenInformalReasoner
 from .minif2f import REVISION, MiniF2FCase, load_dataset, select_cases, sha, statement_probe
 from .orchestrator import ProofAgent, validate_task_preserved
+from .portfolio import solve_portfolio
 from .reproducibility import immutable_artifact_path, run_metadata
 from .retrieval.lean_explore import LeanExploreMCPClient
 from .telemetry import _serializable
@@ -56,14 +57,14 @@ def environment_metadata(config: AppConfig) -> dict:
 
 
 def variant_config(config: AppConfig, variant: str, rounds: int) -> AppConfig:
-    if variant not in {"lean", "v2", "v3", "v4"} or rounds < 1:
+    if variant not in {"lean", "v2", "v3", "v4", "portfolio", "v4_portfolio"} or rounds < 1:
         raise ValueError("Unknown benchmark variant or invalid round budget")
     return replace(config,
-        lean_explore=replace(config.lean_explore, enabled=variant != "lean", required=True),
-        informal_reasoning=replace(config.informal_reasoning, enabled=variant in {"v3", "v4"},
+        lean_explore=replace(config.lean_explore, enabled=variant not in {"lean", "portfolio"}, required=True),
+        informal_reasoning=replace(config.informal_reasoning, enabled=variant in {"v3", "v4", "v4_portfolio"},
                                     verifier_enabled=True, rewrite_salvage_enabled=False),
-        v4=replace(config.v4, enabled=variant == "v4"),
-        agent=replace(config.agent, max_iterations=rounds, fallback_enabled=False,
+        v4=replace(config.v4, enabled=variant in {"v4", "v4_portfolio"}),
+        agent=replace(config.agent, max_iterations=rounds, fallback_enabled=variant in {"portfolio", "v4_portfolio"},
                       unload_model_after_attempt=False))
 
 
@@ -76,6 +77,8 @@ def summarize(payload: dict) -> dict:
         statuses = Counter(r["status"] for r in runs)
         metrics = [r["attempt"]["metrics"] for r in runs if r.get("attempt")]
         result[variant] = {
+            "proof_format": payload["spec"].get("effective_configs", {}).get(variant, {}).get(
+                "generation", {}).get("proof_format", "full_file") if variant != "portfolio" else "deterministic_tactics",
             "selected_problems": len(selected), "completed_attempts": len(runs),
             "scheduled_attempts": len(selected) * payload["spec"]["attempts_per_theorem"],
             "verified_problems": len(verified_ids),
@@ -97,10 +100,20 @@ def summarize(payload: dict) -> dict:
                 + m["discussion_partner_calls"] for m in metrics),
             "generated_tokens": sum(m["completion_tokens"] + m["informal_completion_tokens"]
                                      + m.get("discussion_completion_tokens", 0) for m in metrics),
+            "formal_output_truncations": sum(m.get("formal_output_truncations", 0) for m in metrics),
+            "formal_output_repetitions": sum(m.get("formal_output_repetitions", 0) for m in metrics),
+            "formal_output_budget_increases": sum(m.get("formal_output_budget_increases", 0) for m in metrics),
             "prompt_tokens": sum(m["prompt_tokens"] + m["informal_prompt_tokens"]
                                   + m.get("discussion_prompt_tokens", 0) for m in metrics),
             "model_load_seconds": sum(m["model_load_seconds"] for m in metrics),
             "kimina_checks_in_agent": sum(m["kimina_checks"] for m in metrics),
+            "portfolio_checks": sum(m.get("portfolio_checks", 0) for m in metrics),
+            "portfolio_wall_clock_seconds": sum(m.get("portfolio_wall_clock_seconds", 0.0) for m in metrics),
+            "portfolio_verified_problems": len({r["case_id"] for r in runs if r["verified"]
+                and r.get("attempt") and r["attempt"]["metrics"].get("portfolio_successes", 0)}),
+            "portfolio_tactic_successes": dict(Counter(f["tactic"] for r in runs if r["verified"]
+                and r.get("attempt") for f in r["attempt"].get("fallback_attempts", [])
+                if f["verification"]["valid"] and not f["tactic"].startswith("rewrite_prefix:"))),
             "independent_rechecks": sum(r.get("audit") is not None for r in runs),
             "informal_generator_calls": sum(m["informal_generator_calls"] for m in metrics),
             "informal_verifier_calls": sum(m["informal_verifier_calls"] for m in metrics),
@@ -183,9 +196,9 @@ def run_benchmark(config: AppConfig, *, data: Path, split: str, output: Path,
         if not verifier.health_check():
             raise RuntimeError("Kimina unavailable; checkpoint can be resumed")
         audit_verifier = KiminaVerifier(replace(config.kimina, reuse_repl=False))
-        backend = MLXBackend(config.mlx)
-        feedback = LeanLSPMCPClient(config.lean_lsp)
-        retrieval = LeanExploreMCPClient(config.lean_explore) if any(v != "lean" for v in variants) else None
+        backend = MLXBackend(config.mlx) if any(v != "portfolio" for v in variants) else None
+        feedback = LeanLSPMCPClient(config.lean_lsp) if backend is not None else None
+        retrieval = LeanExploreMCPClient(config.lean_explore) if any(v not in {"lean", "portfolio"} for v in variants) else None
         start = time.monotonic()
         done = {(r["case_id"], r["variant"], r["repetition"]) for r in payload["attempts"]}
         stop = "complete"
@@ -221,7 +234,7 @@ def run_benchmark(config: AppConfig, *, data: Path, split: str, output: Path,
                             cfg = replace(effective[variant], agent=replace(effective[variant].agent,
                                 log_path=output.with_suffix(".events.jsonl")))
                             reasoner = QwenInformalReasoner(backend, cfg.informal_reasoning) if cfg.informal_reasoning.enabled else None
-                            attempt = ProofAgent(backend, verifier, cfg, feedback_provider=feedback,
+                            attempt = solve_portfolio(case.source, verifier, cfg) if variant == "portfolio" else ProofAgent(backend, verifier, cfg, feedback_provider=feedback,
                                 retriever=retrieval if cfg.lean_explore.enabled else None,
                                 informal_reasoner=reasoner).solve(case.source)
                             record["attempt"] = attempt.to_dict()
@@ -255,7 +268,8 @@ def run_benchmark(config: AppConfig, *, data: Path, split: str, output: Path,
         finally:
             unloaded = None
             cleanup_errors = []
-            for name, close in [("model", backend.unload_model), ("lean_lsp", feedback.close),
+            for name, close in [*([("model", backend.unload_model)] if backend else []),
+                                *([("lean_lsp", feedback.close)] if feedback else []),
                                 *(([("retrieval", retrieval.close)]) if retrieval else [])]:
                 try:
                     value = close()

@@ -167,6 +167,10 @@ class AttemptMetrics:
     formal_call_attempts: int = 0
     prompt_tokens: int = 0
     completion_tokens: int = 0
+    formal_output_truncations: int = 0
+    formal_output_repetitions: int = 0
+    formal_output_budget_increases: int = 0
+    formal_output_budget_requests: list[dict[str, Any]] = field(default_factory=list)
     retrieval_calls: int = 0
     retrieval_queries: int = 0
     retrieval_latency_seconds: float = 0.0
@@ -177,6 +181,9 @@ class AttemptMetrics:
     lean_lsp_calls: int = 0
     kimina_checks: int = 0
     fallback_checks: int = 0
+    portfolio_checks: int = 0
+    portfolio_wall_clock_seconds: float = 0.0
+    portfolio_successes: int = 0
     formal_specialist_calls: int = 0
     informal_generator_calls: int = 0
     informal_verifier_calls: int = 0
@@ -207,6 +214,10 @@ class IterationRecord:
     retrieval: RetrievalResult | None = None
     strategy_retrieval: tuple[RetrievalResult, ...] = ()
     repair_action: str | None = None
+    requested_output_tokens: int | None = None
+    output_status: str = "not_recorded"
+    output_budget_action: str | None = None
+    proof_body_normalization: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -214,6 +225,7 @@ class FallbackAttempt:
     tactic: str
     candidate: str
     verification: VerificationResult
+    wall_clock_seconds: float = 0.0
 
 
 @dataclass(slots=True)

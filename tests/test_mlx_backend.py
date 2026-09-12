@@ -8,6 +8,19 @@ from local_lean_agent.types import ChatMessage
 
 class MLXBackendTests(unittest.TestCase):
     @patch("local_lean_agent.backends.mlx.request_json")
+    def test_formal_experiment_budgets_are_forwarded_without_clamping(self, request):
+        request.return_value = {"choices": [{"message": {"content": "proof"},
+                                             "finish_reason": "length"}]}
+        backend = MLXBackend(MLXConfig(managed_server=False))
+        backend._model_id = "test-model"
+        for budget in (512, 1024, 2048):
+            with self.subTest(budget=budget):
+                result = backend.chat([ChatMessage("user", "prove")], max_tokens=budget,
+                                      temperature=0.0, top_p=0.95)
+                self.assertEqual(request.call_args.kwargs["payload"]["max_tokens"], budget)
+                self.assertEqual(result.finish_reason, "length")
+
+    @patch("local_lean_agent.backends.mlx.request_json")
     def test_chat_uses_openai_compatible_contract(self, request) -> None:
         request.return_value = {
             "model": "test-model",

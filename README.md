@@ -321,6 +321,18 @@ compatibility preflight and independent Kimina proof audits.
 See [V7 setup, evaluation protocol and commands](docs/v7-minif2f.md). Start with
 the validation split; full benchmark scores and smoke tests are different claims.
 
+The opt-in [formal output-budget hardening experiment](docs/output-budget-hardening.md)
+adds fixed 512/1,024/2,048-token budgets and adaptive truncation recovery across
+main, reset and fresh formal requests. It logs truncation separately from Lean
+errors; legacy behavior remains the default. No accuracy gain is claimed before
+running the controlled comparison.
+
+The [proof-body and tactic-portfolio experiment](docs/proof-body-portfolio.md)
+adds immutable proof-slot assembly (`--proof-format proof_body`) and separately
+labelled `portfolio`, `v4`, and `v4_portfolio` MiniF2F conditions. Compiler trials,
+wall time, and audited portfolio successes are attributed separately from model
+calls. Whole-file generation remains available as the control.
+
 ## Next milestones
 
 1. Address the measured V4 Lean-formalization and informal-output-budget failures,

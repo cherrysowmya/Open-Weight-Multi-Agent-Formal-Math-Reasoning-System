@@ -13,6 +13,13 @@ max_output_tokens = 512
 temperature = 0.0
 top_p = 0.95
 enable_thinking = false
+# Opt in per run using --formal-output-policy adaptive (or fixed).
+# Legacy preserves the pre-hardening policy; do not silently change the baseline.
+output_budget_policy = "legacy"
+max_recovery_output_tokens = 2048
+reset_output_tokens = 512
+# Opt-in body assembly; full_file keeps the historical prompt/output contract.
+proof_format = "full_file"
 
 [kimina]
 base_url = "http://127.0.0.1:8000"
