@@ -1,5 +1,8 @@
 # V3.1 — strategy retrieval and invalid-rewrite recovery
 
+> Development-tool commands in this guide require files excluded from the current
+> public checkout. See [tool availability and historical recovery](development-tools.md).
+
 This hardening addresses the observed `my_v3` failure without adding V4 roles.
 The informal proof was sound, but the main agent repeatedly used an inequality
 as a rewrite rule. Symbol-heavy retrieval returned mostly irrelevant declarations.

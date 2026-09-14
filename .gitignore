@@ -11,6 +11,11 @@ __pycache__/
 runs/*
 !runs/.gitkeep
 
+# Local development tools; not included in the public runtime checkout.
+/tests/
+/scripts/test-*.py
+/scripts/audit-*.py
+
 # Local secrets and downloaded model weights.
 .env
 .env.*

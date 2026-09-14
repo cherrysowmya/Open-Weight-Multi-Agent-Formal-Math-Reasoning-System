@@ -1,5 +1,8 @@
 # V4 validation status — September 9, 2026
 
+> Development-tool commands in this guide require files excluded from the current
+> public checkout. See [tool availability and historical recovery](development-tools.md).
+
 The V4 implementation is available as package `0.4.0`, prompt version `v4.0.0`.
 The real-Qwen V3/V4 comparison completed: both conditions solved **0/2 positive
 theorems** and correctly left the false theorem unproved. V4 activated its new

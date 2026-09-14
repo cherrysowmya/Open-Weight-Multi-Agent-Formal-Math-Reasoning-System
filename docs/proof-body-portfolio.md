@@ -1,5 +1,8 @@
 # Proof bodies and bounded tactic-portfolio evaluation
 
+> Development-tool commands in this guide require files excluded from the current
+> public checkout. See [tool availability and historical recovery](development-tools.md).
+
 These are separate, opt-in hardening features. The historical five-problem
 MiniF2F result and its whole-file configuration are not overwritten.
 

@@ -1,5 +1,8 @@
 # V7 — Local MiniF2F evaluation
 
+> Development-tool commands in this guide require files excluded from the current
+> public checkout. See [tool availability and historical recovery](development-tools.md).
+
 V7 evaluates the existing V1–V4 agent on a pinned external benchmark. It does
 not add the V5 specialist or claim V6 model-routing hardening is finished.
 Inference remains Qwen3-8B through MLX-LM; no paid API or NVIDIA dependency.

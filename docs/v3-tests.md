@@ -1,5 +1,8 @@
 # V3 testing guide
 
+> Development-tool commands in this guide require files excluded from the current
+> public checkout. See [tool availability and historical recovery](development-tools.md).
+
 V3 is V2 plus informal generation and independent criticism. Tests must separate
 software correctness, model mathematical judgment, and formal proof success.
 No mocked verifier verdict demonstrates that Qwen can detect a mathematical gap.

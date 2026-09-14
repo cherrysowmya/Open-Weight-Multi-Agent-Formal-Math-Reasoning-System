@@ -1,5 +1,8 @@
 # V3 validation results — September 2, 2026 (America/New_York)
 
+> Development-tool commands in this guide require files excluded from the current
+> public checkout. See [tool availability and historical recovery](development-tools.md).
+
 These results separate software contracts, real compiler behavior, and model
 quality. Artifact timestamps after midnight use September 3 UTC.
 

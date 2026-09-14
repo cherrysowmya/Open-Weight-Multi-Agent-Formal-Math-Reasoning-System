@@ -1,5 +1,8 @@
 # Formal output-budget hardening experiment
 
+> Development-tool commands in this guide require files excluded from the current
+> public checkout. See [tool availability and historical recovery](development-tools.md).
+
 This opt-in change addresses output-budget recovery only. It does not add a
 specialist, enable tactic fallbacks, change informal/discussion budgets, or
 change the theorem-solving round budget. The previous MiniF2F result remains

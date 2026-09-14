@@ -15,6 +15,22 @@ Qwen prompts, retrieval provenance/metrics, and a paired retrieval OFF/ON suite.
 V3 reuses the same loaded Qwen weights for a thinking-enabled informal generator
 and fresh-context critical verifier. The specialist prover remains a later milestone.
 
+## Public checkout contents
+
+The public checkout includes the agent, configuration, examples, benchmarks,
+documentation, and these installation/startup helpers:
+
+- `scripts/setup-lean-lsp-mcp.sh`
+- `scripts/setup-lean-explore.sh`
+- `scripts/start-kimina.sh`
+
+Development tests and standalone research test/audit scripts are not included
+in the current checkout. They remain in Git history; existing local copies are
+preserved and ignored by Git. Historical research documentation may reference
+those tools—see [development tool availability](docs/development-tools.md).
+The packaged CLI benchmark commands remain available. Existing `runs/` outputs
+are also excluded; new results are created locally when you run the system.
+
 ## Architecture boundary
 
 Agent code depends on `ModelBackend`, not MLX. `MLXBackend` implements
@@ -271,7 +287,7 @@ Both conditions keep V2 retrieval enabled and disable whole-proof fallback and
 compiler-prefix tactic probes. The V3 condition adds informal reasoning and its
 configured strategy-search/rewrite-prompt hooks; improvements cannot be attributed
 to the informal text alone. See [V3 design and experiment methodology](docs/v3.md)
-for isolation guarantees, metrics, interpretation, and the independent audit command.
+for isolation guarantees, metrics, interpretation, and historical audit methodology.
 The [V3 testing guide](docs/v3-tests.md) covers deterministic contracts, live
 mathematical critique tests, real Lean integration, and generator-only ablation.
 The [V3.1 hardening guide](docs/v3-hardening.md) documents strategy-derived
@@ -289,8 +305,6 @@ without truncating the theorem or selected Lean goals/hypotheses.
   examples/my_v4.lean --v4 on --max-rounds 4 \
   --output runs/my_v4.proved.lean
 
-.venv/bin/python scripts/test-v4-live.py \
-  --output runs/v4-ablation-latest.json
 ```
 
 Use `--v4 off` for a V3 solve. The V1/V2/V3 benchmark commands automatically
@@ -299,11 +313,9 @@ disable V4. See [V4 usage and architecture](docs/v4.md) and
 completed: both conditions solved 0/2 positive cases and correctly rejected the
 negative case. V4 used more time and tokens, with all new roles activated.
 
-Run the dependency-free unit tests:
-
-```bash
-PYTHONPATH=src python -m unittest discover -s tests -v
-```
+For installation diagnostics, run `local-lean-agent --config config/local.toml doctor`.
+Development-only tests and research runners are described in
+[development tool availability](docs/development-tools.md).
 
 ## V7 MiniF2F evaluation
 
