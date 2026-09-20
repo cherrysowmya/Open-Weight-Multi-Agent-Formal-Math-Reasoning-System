@@ -31,6 +31,21 @@ those tools—see [development tool availability](docs/development-tools.md).
 The packaged CLI benchmark commands remain available. Existing `runs/` outputs
 are also excluded; new results are created locally when you run the system.
 
+## Live terminal demonstration
+
+Run an editable Lean input with actual agent/tool progress and final metrics:
+
+```bash
+.venv/bin/local-lean-agent --config config/local.toml solve \
+  examples/demo_repair.lean --live --proof-format proof_body \
+  --max-rounds 3 --informal-policy off --v4 off
+```
+
+Each live run saves a dedicated trace, full result, and successful proof under
+`runs/demo/`; the terminal prints their absolute paths. See the
+[step-by-step demo guide](docs/terminal-demo.md) for setup, an informal reasoning
+demo, a negative control, and a presentation walkthrough.
+
 ## Architecture boundary
 
 Agent code depends on `ModelBackend`, not MLX. `MLXBackend` implements

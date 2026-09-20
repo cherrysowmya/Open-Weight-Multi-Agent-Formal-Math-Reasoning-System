@@ -9,6 +9,8 @@ from pathlib import Path
 import shutil
 import sys
 import time
+from datetime import datetime
+from uuid import uuid4
 
 from .backends.mlx import MLXBackend
 from .config import AppConfig, _validate, load_config
@@ -17,7 +19,8 @@ from .informal.qwen import QwenInformalReasoner
 from .orchestrator import ProofAgent
 from .reproducibility import immutable_artifact_path, run_metadata, write_json
 from .retrieval.lean_explore import LeanExploreMCPClient
-from .telemetry import _serializable
+from .telemetry import JSONLTelemetry, _serializable
+from .progress import TerminalProgress, demo_summary
 from .types import AttemptResult, FailureCategory
 from .v1_suite import assess_v1_result, load_v1_cases, suite_case_payload
 from .v2_suite import (
@@ -43,6 +46,8 @@ def build_parser() -> argparse.ArgumentParser:
     solve = subparsers.add_parser("solve", help="Generate and verify a Lean proof")
     solve.add_argument("input", type=Path, help="Lean file containing the task")
     solve.add_argument("--output", type=Path, default=None, help="Write the final candidate")
+    solve.add_argument("--live", action="store_true", help="Show live stages and final metrics; save a dedicated demo trace")
+    solve.add_argument("--trace", type=Path, help="Append detailed JSONL events to this path")
     solve.add_argument(
         "--full-json",
         action="store_true",
@@ -289,6 +294,23 @@ def main(argv: list[str] | None = None) -> int:
                     agent=replace(config.agent, max_iterations=args.max_rounds),
                 )
             theorem = args.input.read_text(encoding="utf-8")
+            if args.live:
+                demo_dir = config.agent.result_dir.parent / "demo" / (
+                    datetime.now().strftime("%Y%m%d-%H%M%S") + "-" + uuid4().hex[:8])
+                config = replace(config, agent=replace(config.agent,
+                    log_path=args.trace or demo_dir / "events.jsonl", result_dir=demo_dir))
+                if args.output is None:
+                    args.output = demo_dir / "verified.lean"
+            elif args.trace:
+                config = replace(config, agent=replace(config.agent, log_path=args.trace))
+            if config.agent.log_path.resolve() == args.input.resolve():
+                raise ValueError("Trace path must not overwrite the input Lean file")
+            if args.output and config.agent.log_path.resolve() == args.output.resolve():
+                raise ValueError("Trace and proof output must use different paths")
+            telemetry = JSONLTelemetry(config.agent.log_path, TerminalProgress() if args.live else None)
+            if args.live:
+                print(f"Live stages appear below. Full trace: {config.agent.log_path.resolve()}",
+                      file=sys.stderr, flush=True)
             feedback = _feedback_provider(config)
             retriever = _semantic_retriever(config)
             backend = MLXBackend(config.mlx)
@@ -302,6 +324,7 @@ def main(argv: list[str] | None = None) -> int:
                     backend,
                     KiminaVerifier(config.kimina),
                     config,
+                    telemetry=telemetry,
                     feedback_provider=feedback,
                     retriever=retriever,
                     informal_reasoner=informal_reasoner,
@@ -312,11 +335,15 @@ def main(argv: list[str] | None = None) -> int:
                     feedback.close()
                 if retriever is not None:
                     retriever.close()
-            _write_attempt_result(result, config.agent.result_dir)
+            result_file = _write_attempt_result(result, config.agent.result_dir)
+            proof_file = None
             if args.output is not None and result.success and result.final_proof:
                 args.output.parent.mkdir(parents=True, exist_ok=True)
                 args.output.write_text(result.final_proof, encoding="utf-8")
-            printable = result if args.full_json else _terminal_summary(result)
+                proof_file = args.output
+            printable = result if args.full_json else (demo_summary(result,
+                trace=config.agent.log_path, result_file=result_file, proof_file=proof_file)
+                if args.live else _terminal_summary(result))
             print(json.dumps(_serializable(printable), indent=2, ensure_ascii=False))
             return 0 if result.success else 1
     except (OSError, ValueError, RuntimeError) as exc:

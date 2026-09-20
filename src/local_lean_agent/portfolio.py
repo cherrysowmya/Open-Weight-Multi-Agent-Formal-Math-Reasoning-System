@@ -22,6 +22,7 @@ def try_portfolio(theorem: str, *, verifier: LeanVerifier, config: AppConfig,
         attempted.add(key)
         candidate = slot.assemble("by\n  " + tactic)
         started = time.monotonic()
+        telemetry.emit("portfolio_check_started", attempt_id, {"tactic": tactic})
         verification = verifier.verify(candidate, attempt_id=f"{attempt_id}-portfolio-{len(attempts) + 1}")
         elapsed = time.monotonic() - started
         metrics.kimina_checks += 1

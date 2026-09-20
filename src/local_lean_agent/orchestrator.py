@@ -89,10 +89,12 @@ class ProofAgent:
             should_generate = True
             if has_concrete_proof_candidate(theorem):
                 candidate = theorem
+                self.telemetry.emit("lean_check_started", attempt_id, {"source": "input candidate"})
                 verification = self.verifier.verify(
                     candidate, attempt_id=f"{attempt_id}-input"
                 )
                 metrics.kimina_checks += 1
+                self.telemetry.emit("lean_check_completed", attempt_id, verification)
                 lean_feedback = self._inspect_failure(
                     candidate,
                     verification,
@@ -149,10 +151,12 @@ class ProofAgent:
 
             if should_generate:
                 load_started = time.monotonic()
+                self.telemetry.emit("model_loading", attempt_id, {"model": self.config.mlx.model_id})
                 metrics.model_load_seconds = self.backend.load_model(
                     self.config.mlx.model_id
                 )
                 model_loaded = True
+                self.telemetry.emit("model_loaded", attempt_id, {"model": self.config.mlx.model_id})
                 if metrics.model_load_seconds == 0.0:
                     metrics.model_load_seconds = time.monotonic() - load_started
                 metrics.memory_samples_mb.append(
@@ -426,10 +430,12 @@ class ProofAgent:
                         failure_category=repeated_record.verification.failure_category,
                     )
                 else:
+                    self.telemetry.emit("lean_check_started", attempt_id, {"source": "model candidate", "iteration": iteration})
                     verification = self.verifier.verify(
                         candidate, attempt_id=f"{attempt_id}-{iteration}"
                     )
                     metrics.kimina_checks += 1
+                    self.telemetry.emit("lean_check_completed", attempt_id, verification)
                     lean_feedback = self._inspect_failure(
                         candidate,
                         verification,
@@ -583,7 +589,9 @@ class ProofAgent:
                     request.error_message = error_message or "Request did not complete"
                     self.telemetry.emit("v4_request_failed", attempt_id, request)
             if self.config.agent.unload_model_after_attempt and model_loaded:
+                self.telemetry.emit("model_unloading", attempt_id, {})
                 metrics.model_unload_seconds = self.backend.unload_model()
+                self.telemetry.emit("model_unloaded", attempt_id, {})
             metrics.wall_clock_seconds = time.monotonic() - started
 
         success = bool(records and records[-1].verification.valid)
@@ -698,7 +706,8 @@ class ProofAgent:
             )
         else:
             try:
-                result = self.informal_reasoner.reason(packet)
+                result = self.informal_reasoner.reason_with_events(packet,
+                    lambda event, payload: self.telemetry.emit(event, attempt_id, payload))
             except Exception as exc:
                 # Optional reasoning must not prevent the formal repair path.
                 result = InformalReasoningResult(
@@ -746,6 +755,7 @@ class ProofAgent:
                 error_message="Lean-LSP-MCP is enabled but no feedback provider was configured",
             )
         else:
+            self.telemetry.emit("lean_lsp_started", attempt_id, {})
             feedback = self.feedback_provider.inspect(
                 candidate,
                 compiler_diagnostics=verification.diagnostics,
@@ -811,6 +821,7 @@ class ProofAgent:
                 if fingerprint in attempted:
                     continue
                 attempted.add(fingerprint)
+                self.telemetry.emit("salvage_check_started", attempt_id, {"tactic": tactic})
                 checked = self.verifier.verify(
                     salvaged,
                     attempt_id=f"{attempt_id}-{iteration}-rewrite-salvage-{len(attempts) + 1}",
@@ -879,6 +890,7 @@ class ProofAgent:
                 ),
             )
         else:
+            self.telemetry.emit("semantic_retrieval_started", attempt_id, {"query": query, "strategy": strategy})
             result = self.retriever.retrieve(query)
         cache[query] = result
         metrics.retrieval_queries += 1

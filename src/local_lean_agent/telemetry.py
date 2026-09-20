@@ -10,8 +10,9 @@ from typing import Any
 
 
 class JSONLTelemetry:
-    def __init__(self, path: str | Path):
+    def __init__(self, path: str | Path, observer=None):
         self.path = Path(path)
+        self.observer = observer
         self._lock = threading.Lock()
 
     def emit(self, event: str, attempt_id: str, payload: Any) -> None:
@@ -25,6 +26,12 @@ class JSONLTelemetry:
         line = json.dumps(record, sort_keys=True, ensure_ascii=False)
         with self._lock, self.path.open("a", encoding="utf-8") as handle:
             handle.write(line + "\n")
+        if self.observer is not None:
+            try:
+                self.observer(record)
+            except Exception:
+                # Presentation failures must not change proof verification.
+                pass
 
 
 def _serializable(value: Any) -> Any:

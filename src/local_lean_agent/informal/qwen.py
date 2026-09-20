@@ -104,6 +104,7 @@ class QwenInformalReasoner(InformalReasoner):
                     _estimate_tokens(generator_messages), self.config.max_output_tokens,
                     self.config.generator_temperature, self.config.top_p,
                 ))
+                self._emit_event("informal_role_started", requests[-1])
                 generated = self.backend.chat(
                     generator_messages,
                     max_tokens=self.config.max_output_tokens,
@@ -111,6 +112,8 @@ class QwenInformalReasoner(InformalReasoner):
                     top_p=self.config.top_p,
                     extra={"chat_template_kwargs": {"enable_thinking": True}},
                 )
+                self._emit_event("informal_role_completed", {"role": "generator", "round": round_number,
+                                 "finish_reason": generated.finish_reason, "usage": generated.usage})
                 proof = _extract_tag(generated.text, "informal_proof")
                 queries, query_error = parse_lemma_queries(
                     generated.text, limit=self.config.strategy_query_limit,
@@ -177,6 +180,7 @@ class QwenInformalReasoner(InformalReasoner):
                     _estimate_tokens(verifier_messages), self.config.max_output_tokens,
                     self.config.verifier_temperature, self.config.top_p,
                 ))
+                self._emit_event("informal_role_started", requests[-1])
                 reviewed = self.backend.chat(
                     verifier_messages,
                     max_tokens=self.config.max_output_tokens,
@@ -188,6 +192,9 @@ class QwenInformalReasoner(InformalReasoner):
                 critique = critique[:self.config.max_critique_chars]
                 if not critique or reviewed.finish_reason == "length":
                     verdict = InformalVerdict.MALFORMED
+                self._emit_event("informal_role_completed", {"role": "verifier", "round": round_number,
+                                 "verdict": verdict, "finish_reason": reviewed.finish_reason,
+                                 "usage": reviewed.usage})
                 reviews.append(
                     InformalReview(
                         refinement_round=round_number,
