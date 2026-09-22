@@ -1,4 +1,4 @@
-"""Sequential, resumable MiniF2F evaluation on the existing local agent stack."""
+"""Sequential, resumable, independently audited local benchmark evaluation."""
 from __future__ import annotations
 
 from collections import Counter
@@ -14,15 +14,16 @@ import tempfile
 import time
 
 from .backends.mlx import MLXBackend
-from .config import AppConfig
+from .config import AppConfig, _validate
+from . import intro_logic
 from .feedback.lean_lsp_mcp import LeanLSPMCPClient
 from .informal.qwen import QwenInformalReasoner
 from .minif2f import REVISION, MiniF2FCase, load_dataset, select_cases, sha, statement_probe
 from .orchestrator import ProofAgent, validate_task_preserved
-from .portfolio import solve_portfolio
 from .reproducibility import immutable_artifact_path, run_metadata
 from .retrieval.lean_explore import LeanExploreMCPClient
-from .telemetry import _serializable
+from .telemetry import _serializable, JSONLTelemetry
+from .progress import TerminalProgress
 from .verification.kimina import KiminaVerifier
 
 
@@ -56,16 +57,21 @@ def environment_metadata(config: AppConfig) -> dict:
             if (project / "lean-toolchain").exists() else None}
 
 
-def variant_config(config: AppConfig, variant: str, rounds: int) -> AppConfig:
-    if variant not in {"lean", "v2", "v3", "v4", "portfolio", "v4_portfolio"} or rounds < 1:
+def variant_config(config: AppConfig, variant: str, rounds: int, *, allow_v5: bool = False) -> AppConfig:
+    if config.specialist.enabled and not allow_v5:
+        raise ValueError("V1–V4 benchmark labels must not include a V5 specialist")
+    if variant not in ({"lean", "v2", "v3", "v4", "v5"} if allow_v5 else {"lean", "v2", "v3", "v4"}) or rounds < 1:
         raise ValueError("Unknown benchmark variant or invalid round budget")
-    return replace(config,
-        lean_explore=replace(config.lean_explore, enabled=variant not in {"lean", "portfolio"}, required=True),
-        informal_reasoning=replace(config.informal_reasoning, enabled=variant in {"v3", "v4", "v4_portfolio"},
-                                    verifier_enabled=True, rewrite_salvage_enabled=False),
-        v4=replace(config.v4, enabled=variant in {"v4", "v4_portfolio"}),
-        agent=replace(config.agent, max_iterations=rounds, fallback_enabled=variant in {"portfolio", "v4_portfolio"},
+    result = replace(config,
+        lean_explore=replace(config.lean_explore, enabled=variant != "lean", required=True),
+        informal_reasoning=replace(config.informal_reasoning, enabled=variant in {"v3", "v4", "v5"},
+                                    verifier_enabled=True),
+        v4=replace(config.v4, enabled=variant in {"v4", "v5"}),
+        specialist=replace(config.specialist, enabled=variant == "v5"),
+        agent=replace(config.agent, max_iterations=rounds,
                       unload_model_after_attempt=False))
+    _validate(result)
+    return result
 
 
 def summarize(payload: dict) -> dict:
@@ -74,14 +80,19 @@ def summarize(payload: dict) -> dict:
         runs = [r for r in payload["attempts"] if r["variant"] == variant]
         selected = payload["spec"]["case_ids"]
         verified_ids = {r["case_id"] for r in runs if r["verified"]}
+        attempted_ids = {r["case_id"] for r in runs}
         statuses = Counter(r["status"] for r in runs)
         metrics = [r["attempt"]["metrics"] for r in runs if r.get("attempt")]
         result[variant] = {
             "proof_format": payload["spec"].get("effective_configs", {}).get(variant, {}).get(
-                "generation", {}).get("proof_format", "full_file") if variant != "portfolio" else "deterministic_tactics",
+                "generation", {}).get("proof_format", "full_file"),
             "selected_problems": len(selected), "completed_attempts": len(runs),
             "scheduled_attempts": len(selected) * payload["spec"]["attempts_per_theorem"],
             "verified_problems": len(verified_ids),
+            "attempted_problems": len(attempted_ids),
+            "unattempted_problems": len(selected) - len(attempted_ids),
+            "not_verified_attempted_problems": len(attempted_ids - verified_ids),
+            "success_rate_attempted": len(verified_ids) / len(attempted_ids) if attempted_ids else None,
             "success_rate_selected": len(verified_ids) / len(selected),
             "first_attempt_verified": sum(r["verified"] and r["repetition"] == 1 for r in runs),
             "first_candidate_verified": sum(bool(r["verified"] and r.get("attempt")
@@ -107,36 +118,44 @@ def summarize(payload: dict) -> dict:
                                   + m.get("discussion_prompt_tokens", 0) for m in metrics),
             "model_load_seconds": sum(m["model_load_seconds"] for m in metrics),
             "kimina_checks_in_agent": sum(m["kimina_checks"] for m in metrics),
-            "portfolio_checks": sum(m.get("portfolio_checks", 0) for m in metrics),
-            "portfolio_wall_clock_seconds": sum(m.get("portfolio_wall_clock_seconds", 0.0) for m in metrics),
-            "portfolio_verified_problems": len({r["case_id"] for r in runs if r["verified"]
-                and r.get("attempt") and r["attempt"]["metrics"].get("portfolio_successes", 0)}),
-            "portfolio_tactic_successes": dict(Counter(f["tactic"] for r in runs if r["verified"]
-                and r.get("attempt") for f in r["attempt"].get("fallback_attempts", [])
-                if f["verification"]["valid"] and not f["tactic"].startswith("rewrite_prefix:"))),
             "independent_rechecks": sum(r.get("audit") is not None for r in runs),
             "informal_generator_calls": sum(m["informal_generator_calls"] for m in metrics),
             "informal_verifier_calls": sum(m["informal_verifier_calls"] for m in metrics),
             "discussion_calls": sum(m["discussion_partner_calls"] for m in metrics),
             "fresh_context_calls": sum(m.get("fresh_subproblem_calls", 0) for m in metrics),
             "retrieval_calls": sum(m["retrieval_calls"] for m in metrics),
+            "formal_specialist_calls": sum(m.get("formal_specialist_calls", 0) for m in metrics),
+            "specialist_successes": sum(m.get("specialist_successes", 0) for m in metrics),
             "lean_lsp_calls": sum(m["lean_lsp_calls"] for m in metrics),
             "failure_categories": dict(Counter(r["status"] if r["status"] == "audit_failed"
                 else r["attempt"]["failure_category"]
                 for r in runs if r.get("attempt") and not r["verified"])),
         }
+        if "case_worlds" in payload["spec"]:
+            worlds = payload["spec"]["case_worlds"]
+            result[variant]["by_world"] = {
+                world: {"selected": sum(w == world for w in worlds.values()),
+                        "verified": sum(worlds[c] == world for c in verified_ids),
+                        "success_rate_selected": sum(worlds[c] == world for c in verified_ids)
+                            / sum(w == world for w in worlds.values())}
+                for world in sorted(set(worlds.values()))}
     return result
 
 
-def validate_dataset(config: AppConfig, cases: list[MiniF2FCase], output: Path) -> dict:
+def validate_dataset(config: AppConfig, cases: list[MiniF2FCase], output: Path,
+                     *, dataset: str = "minif2f") -> dict:
     verifier = KiminaVerifier(config.kimina)
+    if dataset not in {"minif2f", "intro-logic"} or not cases:
+        raise ValueError("Unknown dataset or empty validation selection")
     if not verifier.health_check():
         raise RuntimeError("Kimina unavailable")
     payload = {"purpose": "statement_elaboration_only_not_proof_verification",
-               "dataset_revision": REVISION,
+               "dataset": dataset,
+               "dataset_revision": intro_logic.REVISION if dataset == "intro-logic" else REVISION,
                "environment": environment_metadata(config), "complete": False, "cases": []}
     for case in cases:
-        probe = verifier.verify(statement_probe(case), attempt_id="minif2f-statement-" + case.case_id)
+        source = intro_logic.statement_probe(case) if dataset == "intro-logic" else statement_probe(case)
+        probe = verifier.verify(source, attempt_id=dataset + "-statement-" + case.case_id)
         payload["cases"].append({"id": case.case_id, "split": case.split,
                                  "source_sha256": case.sha256, "compatible": probe.valid,
                                  "verification": probe})
@@ -151,13 +170,19 @@ def validate_dataset(config: AppConfig, cases: list[MiniF2FCase], output: Path) 
 def run_benchmark(config: AppConfig, *, data: Path, split: str, output: Path,
                   variants: tuple[str, ...] = ("v4",), limit: int = 3, seed: int = 0,
                   ids: tuple[str, ...] = (), rounds: int = 3, attempts: int = 1,
-                  resume: bool = False, max_seconds: float = 1800) -> dict:
+                  resume: bool = False, max_seconds: float = 1800,
+                  dataset: str = "minif2f", live: bool = False) -> dict:
+    if dataset not in {"minif2f", "intro-logic"}:
+        raise ValueError("Unknown benchmark dataset")
     if attempts < 1 or not math.isfinite(max_seconds) or max_seconds <= 0 or not variants or len(set(variants)) != len(variants):
         raise ValueError("Invalid run budgets or duplicate variants")
     if not config.lean_lsp.enabled or not config.lean_lsp.required:
-        raise ValueError("MiniF2F evaluation requires the configured Lean-LSP project")
-    cases = select_cases(load_dataset(data, split), limit=limit, seed=seed, ids=ids)
-    effective = {v: variant_config(config, v, rounds) for v in variants}
+        raise ValueError("Benchmark evaluation requires the configured Lean-LSP project")
+    loader = intro_logic.load_dataset if dataset == "intro-logic" else load_dataset
+    cases = select_cases(loader(data, split), limit=limit, seed=seed, ids=ids)
+    if not cases:
+        raise ValueError("Benchmark selection is empty")
+    effective = {v: variant_config(config, v, rounds, allow_v5=dataset == "intro-logic") for v in variants}
     metadata = run_metadata(config, data / "manifest.json")
     spec = {"dataset_manifest_sha256": metadata["manifest_fingerprint"],
         "code_fingerprint": metadata["code_fingerprint"], "config_fingerprint": metadata["config_fingerprint"],
@@ -165,6 +190,10 @@ def run_benchmark(config: AppConfig, *, data: Path, split: str, output: Path,
         "case_ids": [c.case_id for c in cases], "selection_seed": seed,
         "variants": list(variants), "rounds": rounds, "attempts_per_theorem": attempts,
         "effective_configs": _serializable(effective)}
+    if dataset == "intro-logic":
+        spec.update(dataset=dataset, dataset_revision=intro_logic.REVISION,
+                    evaluation_mode="unrestricted_mathlib_not_game_inventory",
+                    case_worlds={c.case_id: c.world for c in cases})
     output.parent.mkdir(parents=True, exist_ok=True)
     with output.with_suffix(output.suffix + ".lock").open("a") as lock:
         try:
@@ -188,7 +217,7 @@ def run_benchmark(config: AppConfig, *, data: Path, split: str, output: Path,
         elif resume:
             raise ValueError("Cannot resume a missing checkpoint")
         else:
-            payload = {**metadata, "experiment": "minif2f", "spec": spec, "experiment_complete": False,
+            payload = {**metadata, "experiment": dataset, "spec": spec, "experiment_complete": False,
                        "attempts": [], "preflight": {}, "sessions": [], "summary": {}}
         # Create a checkpoint before acquiring expensive service/model resources.
         atomic_json(output, payload)
@@ -196,9 +225,9 @@ def run_benchmark(config: AppConfig, *, data: Path, split: str, output: Path,
         if not verifier.health_check():
             raise RuntimeError("Kimina unavailable; checkpoint can be resumed")
         audit_verifier = KiminaVerifier(replace(config.kimina, reuse_repl=False))
-        backend = MLXBackend(config.mlx) if any(v != "portfolio" for v in variants) else None
+        backend = MLXBackend(config.mlx)
         feedback = LeanLSPMCPClient(config.lean_lsp) if backend is not None else None
-        retrieval = LeanExploreMCPClient(config.lean_explore) if any(v not in {"lean", "portfolio"} for v in variants) else None
+        retrieval = LeanExploreMCPClient(config.lean_explore) if any(v != "lean" for v in variants) else None
         start = time.monotonic()
         done = {(r["case_id"], r["variant"], r["repetition"]) for r in payload["attempts"]}
         stop = "complete"
@@ -215,8 +244,9 @@ def run_benchmark(config: AppConfig, *, data: Path, split: str, output: Path,
                             stop = "session_time_budget"
                             return payload
                         if case.case_id not in payload["preflight"]:
-                            check = verifier.verify(statement_probe(case),
-                                attempt_id="minif2f-preflight-" + case.case_id)
+                            source = intro_logic.statement_probe(case) if dataset == "intro-logic" else statement_probe(case)
+                            check = verifier.verify(source,
+                                attempt_id=dataset + "-preflight-" + case.case_id)
                             payload["preflight"][case.case_id] = _serializable(check)
                             atomic_json(output, payload)
                         preflight = payload["preflight"][case.case_id]
@@ -230,13 +260,21 @@ def run_benchmark(config: AppConfig, *, data: Path, split: str, output: Path,
                         record = {"case_id": case.case_id, "split": split, "source_sha256": case.sha256,
                             "variant": variant, "repetition": repetition, "verified": False,
                             "status": "incompatible_statement", "attempt": None, "audit": None}
+                        if dataset == "intro-logic":
+                            record.update(world=case.world, level=case.level)
                         if preflight["valid"]:
                             cfg = replace(effective[variant], agent=replace(effective[variant].agent,
                                 log_path=output.with_suffix(".events.jsonl")))
                             reasoner = QwenInformalReasoner(backend, cfg.informal_reasoning) if cfg.informal_reasoning.enabled else None
-                            attempt = solve_portfolio(case.source, verifier, cfg) if variant == "portfolio" else ProofAgent(backend, verifier, cfg, feedback_provider=feedback,
+                            telemetry = JSONLTelemetry(cfg.agent.log_path, TerminalProgress() if live else None)
+                            telemetry.emit("benchmark_case_started", f"{case.case_id}-{variant}-{repetition}",
+                                           {"dataset": dataset, "case_id": case.case_id,
+                                            "variant": variant, "repetition": repetition})
+                            attempt = ProofAgent(backend, verifier, cfg, feedback_provider=feedback,
                                 retriever=retrieval if cfg.lean_explore.enabled else None,
-                                informal_reasoner=reasoner).solve(case.source)
+                                informal_reasoner=reasoner,
+                                telemetry=telemetry
+                                ).solve(case.source)
                             record["attempt"] = attempt.to_dict()
                             record["status"] = "proof_failed"
                             if attempt.stop_reason in {"runtime_error", "verifier_unavailable", "lean_lsp_unavailable", "retrieval_unavailable"}:
@@ -283,7 +321,7 @@ def run_benchmark(config: AppConfig, *, data: Path, split: str, output: Path,
             payload["summary"] = summarize(payload)
             if payload["experiment_complete"]:
                 artifact = immutable_artifact_path(output, created_at=payload["created_at"],
-                    run_id=payload["run_id"], label="minif2f-" + split)
+                    run_id=payload["run_id"], label=dataset + "-" + split)
                 payload["immutable_artifact"] = str(artifact)
                 atomic_json(artifact, payload)
             atomic_json(output, payload)

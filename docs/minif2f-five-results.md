@@ -1,5 +1,9 @@
 # MiniF2F five-problem evaluation — 2026-09-10
 
+> Historical methodology notice: automatic tactic portfolios and prefix-salvage
+> trials have been removed. Related commands, settings and assisted scores below
+> describe older versions, not the current solver. See [agent-only repair](agent-only-repair.md).
+
 **Verified theorem-solving accuracy: 0/5 (0%).** All five problems completed
 their three formal-generation rounds; none produced a Lean-accepted proof.
 This is a small validation-set result, not a full MiniF2F test-set score.

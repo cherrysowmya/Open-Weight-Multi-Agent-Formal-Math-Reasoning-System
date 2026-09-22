@@ -11,7 +11,9 @@ class TerminalProgress:
     def __call__(self, record):
         event, data = record["event"], record["payload"]
         message = None
-        if event == "attempt_started":
+        if event == "benchmark_case_started":
+            message = f"Benchmark | {data['case_id']}; condition {data['variant']}; repetition {data['repetition']}."
+        elif event == "attempt_started":
             message = "Orchestrator | Starting theorem attempt; Lean is the final authority."
         elif event == "model_loading":
             message = f"MLX | Loading {data['model']} (cold starts can take a while)."
@@ -34,6 +36,13 @@ class TerminalProgress:
             role = "Informal Generator" if data["role"] == "generator" else "Informal Verifier"
             action = "Developing a mathematical plan" if data["role"] == "generator" else "Independently critiquing the proposed plan"
             message = f"{role} (Qwen) | {action}; fresh context, refinement {data['refinement_round']}."
+        elif event == "specialist_request_started":
+            message = (f"Formal Specialist (DeepSeek) | Round {data['iteration']}: "
+                       f"one candidate in a fresh context; output budget {data['max_output_tokens']} tokens.")
+        elif event == "specialist_request_completed":
+            message = "Formal Specialist | Candidate returned; awaiting independent Lean verification."
+        elif event == "specialist_request_failed":
+            message = "Formal Specialist | Request failed; details saved in trace."
         elif event == "informal_role_completed":
             role = "Informal Generator" if data["role"] == "generator" else "Informal Verifier"
             status = data.get("verdict") or data.get("finish_reason") or "returned"
@@ -52,11 +61,6 @@ class TerminalProgress:
             message = "Lean-LSP-MCP | Inspecting compiler diagnostics and current goals."
         elif event == "lean_lsp_inspected":
             message = "Lean-LSP-MCP | Feedback received." if data.get("available") else "Lean-LSP-MCP | Feedback unavailable; see trace."
-        elif event in {"portfolio_check_started", "salvage_check_started"}:
-            role = "Tactic portfolio" if event == "portfolio_check_started" else "Prefix repair"
-            message = f"{role} (not an LLM) | Lean is testing: {data['tactic']}"
-        elif event in {"fallback_candidate_checked", "rewrite_prefix_salvage_checked"}:
-            message = f"Lean automation | {data['tactic']}: " + ("ACCEPTED." if data["verification"]["valid"] else "rejected.")
         elif event == "proof_body_response_normalized" and data["action"] != "body":
             message = f"Proof assembler | {data['action']}; original task retained."
         elif event == "iteration_completed":
@@ -81,14 +85,16 @@ def demo_summary(result, *, trace, result_file, proof_file):
         "wall_clock_seconds": round(m.wall_clock_seconds, 2),
         "model_calls": {"formal": m.model_calls, "informal_generator": m.informal_generator_calls,
                         "informal_verifier": m.informal_verifier_calls, "discussion": m.discussion_partner_calls,
-                        "fresh_formal_contexts": m.fresh_subproblem_calls},
+                        "fresh_formal_contexts": m.fresh_subproblem_calls,
+                        "formal_specialist": m.formal_specialist_calls},
         "tokens": {"prompt": m.prompt_tokens + m.informal_prompt_tokens + m.discussion_prompt_tokens,
                    "generated": m.completion_tokens + m.informal_completion_tokens + m.discussion_completion_tokens},
         "kimina_checks": m.kimina_checks, "lean_lsp_calls": m.lean_lsp_calls,
-        "retrieval_calls": m.retrieval_calls, "portfolio_checks": m.portfolio_checks,
-        "portfolio_successes": m.portfolio_successes,
+        "retrieval_calls": m.retrieval_calls,
         "model_load_seconds": round(m.model_load_seconds, 2),
         "model_unload_seconds": round(m.model_unload_seconds, 2),
+        "specialist_successes": m.specialist_successes,
+        "model_peak_sampled_rss_mb": m.model_peak_sampled_rss_mb,
         "trace_file": str(trace.resolve()), "full_result_file": str(result_file.resolve()),
         "verified_proof_file": str(proof_file.resolve()) if proof_file else None,
         "error_message": result.error_message,

@@ -26,6 +26,10 @@ class MLXBackend(ModelBackend):
         self._process: subprocess.Popen[bytes] | None = None
 
     @property
+    def supports_model_switching(self) -> bool:
+        return self.config.managed_server
+
+    @property
     def model_id(self) -> str | None:
         return self._model_id
 
@@ -90,8 +94,6 @@ class MLXBackend(ModelBackend):
     def unload_model(self) -> float:
         started = time.monotonic()
         process = self._process
-        self._process = None
-        self._model_id = None
         if process is not None and process.poll() is None:
             process.terminate()
             try:
@@ -99,6 +101,10 @@ class MLXBackend(ModelBackend):
             except subprocess.TimeoutExpired:
                 process.kill()
                 process.wait(timeout=5)
+        # Retain ownership if termination fails: never permit another model to
+        # load while the previous process might still own unified memory.
+        self._process = None
+        self._model_id = None
         return time.monotonic() - started
 
     def health_check(self) -> bool:

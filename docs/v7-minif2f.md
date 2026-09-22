@@ -1,5 +1,9 @@
 # V7 — Local MiniF2F evaluation
 
+> Historical methodology notice: automatic tactic portfolios and prefix-salvage
+> trials have been removed. Related commands, settings and assisted scores below
+> describe older versions, not the current solver. See [agent-only repair](agent-only-repair.md).
+
 > Development-tool commands in this guide require files excluded from the current
 > public checkout. See [tool availability and historical recovery](development-tools.md).
 

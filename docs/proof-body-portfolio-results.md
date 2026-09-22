@@ -1,5 +1,9 @@
 # Five-problem proof-body / portfolio comparison
 
+> Historical methodology notice: automatic tactic portfolios and prefix-salvage
+> trials have been removed. Related commands, settings and assisted scores below
+> describe older versions, not the current solver. See [agent-only repair](agent-only-repair.md).
+
 Run started 2026-09-11; results inspected 2026-09-12.
 Run ID: `9f4e1e03baab4ecdaf5111089ea911f6`.
 All 15 scheduled attempts completed with no recorded infrastructure or cleanup

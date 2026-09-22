@@ -65,6 +65,8 @@ def build_parser() -> argparse.ArgumentParser:
     )
     solve.add_argument("--v4", choices=("on", "off"), default=None,
                        help="Enable or disable V4 discussion and fresh contexts")
+    solve.add_argument("--v5", choices=("on", "off"), default=None,
+                       help="Enable one DeepSeek specialist round after a failed Qwen attempt")
     _formal_output_arguments(solve)
 
     check = subparsers.add_parser("check", help="Check a Lean file with Kimina")
@@ -173,13 +175,33 @@ def build_parser() -> argparse.ArgumentParser:
         benchmark.add_argument("--output", type=Path, default=Path("runs/" + command + "-latest.json"))
         if command.endswith("run"):
             _formal_output_arguments(benchmark)
-            benchmark.add_argument("--variant", action="append", choices=("lean", "v2", "v3", "v4", "portfolio", "v4_portfolio"),
+            benchmark.add_argument("--variant", action="append", choices=("lean", "v2", "v3", "v4"),
                                    help="Repeat for paired conditions; default v4")
             benchmark.add_argument("--max-rounds", type=_positive_int, default=3)
             benchmark.add_argument("--attempts", type=_positive_int, default=1)
             benchmark.add_argument("--max-seconds", type=float, default=1800,
                                    help="Soft session limit checked between theorem attempts")
             benchmark.add_argument("--resume", action="store_true")
+    from .intro_logic import DEFAULT_DATA, WORLDS
+    prepare_logic = subparsers.add_parser("intro-logic-prepare", help="Prepare pinned statement-only logic-game levels")
+    prepare_logic.add_argument("--data", type=Path, default=DEFAULT_DATA)
+    for command in ("intro-logic-validate", "intro-logic-run"):
+        logic = subparsers.add_parser(command, help="Validate or evaluate A Lean Intro to Logic")
+        logic.add_argument("--data", type=Path, default=DEFAULT_DATA)
+        logic.add_argument("--split", choices=("all", "intro", "tactic", *WORLDS), default="all",
+                           help="World/partition, not an independent train/test split")
+        logic.add_argument("--limit", type=int, default=5, help="0 selects every level in the partition")
+        logic.add_argument("--seed", type=int, default=0)
+        logic.add_argument("--case", action="append", default=[])
+        logic.add_argument("--output", type=Path, default=Path("runs/" + command + "-latest.json"))
+        if command.endswith("run"):
+            _formal_output_arguments(logic)
+            logic.add_argument("--variant", action="append", choices=("lean", "v2", "v3", "v4", "v5"))
+            logic.add_argument("--max-rounds", type=_positive_int, default=3)
+            logic.add_argument("--attempts", type=_positive_int, default=1)
+            logic.add_argument("--max-seconds", type=float, default=1800)
+            logic.add_argument("--resume", action="store_true")
+            logic.add_argument("--live", action="store_true")
     return parser
 
 
@@ -211,7 +233,37 @@ def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     try:
         config = load_config(args.config)
+        if setting := getattr(args, "v5", None):
+            config = replace(config, specialist=replace(config.specialist, enabled=setting == "on"))
+            _validate(config)
+        if config.specialist.enabled and args.command not in {"solve", "doctor", "check", "intro-logic-run",
+                                                            "intro-logic-prepare", "intro-logic-validate"}:
+            raise ValueError("Minimal V5 is supported by solve only; disable [specialist] for V1–V4 benchmarks")
         config = _output_budget_overrides(config, args)
+        if args.command.startswith("intro-logic-"):
+            from .intro_logic import load_dataset, prepare_dataset
+            from .minif2f import select_cases
+            from .benchmark import run_benchmark, validate_dataset
+            if args.command == "intro-logic-prepare":
+                manifest = prepare_dataset(args.data)
+                print(json.dumps({"ready": True, "cases": len(manifest["cases"]),
+                                  "revision": manifest["revision"], "data": str(args.data)}, indent=2))
+                return 0
+            if args.command == "intro-logic-validate":
+                cases = select_cases(load_dataset(args.data, args.split), limit=args.limit,
+                                     seed=args.seed, ids=tuple(args.case))
+                result = validate_dataset(config, cases, args.output, dataset="intro-logic")
+                print(json.dumps({key: result[key] for key in ("complete", "compatible", "total")}, indent=2))
+                return 0 if result["compatible"] == result["total"] else 1
+            result = run_benchmark(config, data=args.data, split=args.split, output=args.output,
+                variants=tuple(args.variant or ["v4"]), limit=args.limit, seed=args.seed,
+                ids=tuple(args.case), rounds=args.max_rounds, attempts=args.attempts,
+                resume=args.resume, max_seconds=args.max_seconds, dataset="intro-logic", live=args.live)
+            print(json.dumps({"experiment_complete": result["experiment_complete"],
+                              "summary": result["summary"], "output": str(args.output.resolve()),
+                              "trace_file": str(args.output.with_suffix('.events.jsonl').resolve()),
+                              "stop_reason": result["sessions"][-1]["stop_reason"] if result["sessions"] else None}, indent=2))
+            return 0 if result["experiment_complete"] else 1
         if args.command.startswith("minif2f-"):
             from .minif2f import load_dataset, prepare_dataset, select_cases
             from .benchmark import run_benchmark, validate_dataset
@@ -673,7 +725,6 @@ def _run_v2_ablation(
                             config.agent,
                             max_iterations=case.max_rounds,
                             unload_model_after_attempt=False,
-                            fallback_enabled=False,
                         ),
                     )
                     result = ProofAgent(
@@ -737,7 +788,6 @@ def _run_v2_ablation(
         "manifest": str(manifest),
         "repetitions": repetitions,
         "cases_per_condition": len(cases) * repetitions,
-        "fallback_enabled": False,
         "condition_order": "counterbalanced_by_case_and_repetition",
         "experiment_complete": experiment_complete,
         "preflight": validation,
@@ -745,7 +795,6 @@ def _run_v2_ablation(
             "generation": config.generation,
             "lean_lsp": config.lean_lsp,
             "lean_explore": retrieval_config,
-            "fallback_enabled": False,
             "round_budgets": {case.case_id: case.max_rounds for case in cases},
         },
         "infrastructure_failures": infrastructure_failures,
@@ -791,11 +840,7 @@ def _run_v3_ablation(
         raise ValueError("V3 paired benchmark requires Lean LSP enabled and required")
     if not config.lean_explore.enabled or not config.lean_explore.required:
         raise ValueError("V3 paired benchmark requires LeanExplore enabled and required")
-    # Keep generic tactic-search assistance out of the informal-reasoning
-    # comparison. The separate hardening runner measures this intervention.
-    config = replace(config, informal_reasoning=replace(
-        config.informal_reasoning, rewrite_salvage_enabled=False),
-        v4=replace(config.v4, enabled=False))
+    config = replace(config, v4=replace(config.v4, enabled=False))
     cases = load_v3_cases(manifest)
     metadata = run_metadata(config, manifest)
     verifier = KiminaVerifier(config.kimina)
@@ -840,7 +885,6 @@ def _run_v3_ablation(
                             config.agent,
                             max_iterations=case.max_rounds,
                             unload_model_after_attempt=False,
-                            fallback_enabled=False,
                         ),
                     )
                     result = ProofAgent(
@@ -910,7 +954,6 @@ def _run_v3_ablation(
         "manifest": str(manifest),
         "repetitions": repetitions,
         "cases_per_condition": len(cases) * repetitions,
-        "fallback_enabled": False,
         "retrieval_enabled_both_conditions": True,
         "condition_order": "counterbalanced_by_case_and_repetition",
         "experiment_complete": experiment_complete,
@@ -929,7 +972,6 @@ def _run_v3_ablation(
             "informal_reasoning": informal_config,
             "baseline_informal_enabled": control == "generator-only",
             "baseline_verifier_enabled": False,
-            "fallback_enabled": False,
             "round_budgets": {case.case_id: case.max_rounds for case in cases},
         },
         "infrastructure_failures": infrastructure_failures,

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 
-PROMPT_VERSION = "v4.0.0"
+PROMPT_VERSION = "v5.0.0-specialist"
 
 
 SYSTEM_PROMPT = """You are the main agent in a local Lean 4 theorem prover.
@@ -24,7 +24,11 @@ Lean identifiers are case-sensitive. When `h : a = b` and the goal is `b = a`,
 use `h.symm` or `Eq.symm h` (capital `Eq`).
 Otherwise look for an existing Mathlib lemma or a one-line `simp`, `omega`, or `aesop`
 proof before induction.
-Do not repeat the same induction or tactic recursively. Keep ordinary proofs under 30 lines."""
+Do not repeat the same induction or tactic recursively. Keep ordinary proofs under 30 lines.
+Rejected candidate/error pairs are negative evidence, never proof examples to copy.
+Change the failed step rather than returning the same rejected body. An empty
+retrieval declarations list means no usable evidence was selected; do not invent
+names to fill that gap. Retrieved source is advisory, not proof of applicability."""
 
 
 def initial_prompt(
@@ -172,7 +176,7 @@ name and type; the informal roles are not authorities on declarations."""
 
 def rewrite_repair_prompt(
     theorem: str, diagnostics: str, lean_lsp_feedback: str,
-    retrieved_declarations: str, informal_guidance: str,
+    retrieved_declarations: str, informal_guidance: str, rejected_history: str = "",
 ) -> str:
     return f"""Lean rejected a rewrite step. Rebuild the formal proof
 from the original task; do not copy the discarded candidate or its rewrite.
@@ -208,5 +212,8 @@ Retrieved source may omit its surrounding namespace: use the exact fully qualifi
 declaration name printed beside it, not an unqualified name copied from its body.
 The displayed local context belongs to the discarded candidate. Recreate any
 needed local facts in the new proof; they do not exist automatically.
+<previously_rejected_attempts>
+{rejected_history or "No earlier rejected attempts were recorded."}
+</previously_rejected_attempts>
 Return the complete unchanged theorem with a short proof in a single Lean fence.
 No placeholders. Only Lean can establish success."""

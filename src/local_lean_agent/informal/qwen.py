@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from ..context_evidence import compact_declarations, compact_failures
+
 import json
 import math
 import re
@@ -331,14 +333,23 @@ def _render_packet(packet: InformalTaskPacket, max_chars: int) -> str:
         raise InformalContextBudgetError("The complete theorem does not fit max_packet_chars")
     fields = (
         ("current_goal", packet.current_goal, 2_000),
-        ("retrieved_declarations", packet.retrieved_declarations, 3_000),
         ("lean_diagnostics", packet.diagnostics, 1_500),
         ("failed_strategies", packet.rejected_strategies, 1_500),
+        ("retrieved_declarations", packet.retrieved_declarations, 3_000),
     )
     for name, value, limit in fields:
         if not value:
             continue
-        rendered = value if len(value) <= limit else value[:limit] + "\n[truncated advisory context]"
+        available = max_chars - len("\n\n".join(parts)) - 2 - len(f"<{name}>\n\n</{name}>")
+        limit = max(0, min(limit, available))
+        if name == "retrieved_declarations":
+            rendered = compact_declarations(value, limit)
+        elif name == "failed_strategies":
+            rendered = compact_failures(value, limit)
+        else:
+            rendered = value if len(value) <= limit else value[:limit] + "\n[truncated advisory context]"
+        if not rendered:
+            continue
         block = f"<{name}>\n{rendered}\n</{name}>"
         if len("\n\n".join([*parts, block])) <= max_chars:
             parts.append(block)

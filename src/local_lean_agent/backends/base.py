@@ -10,6 +10,11 @@ from ..types import ChatMessage, GenerationResult
 class ModelBackend(ABC):
     """Provider-neutral boundary used by all agent logic."""
 
+    @property
+    def supports_model_switching(self) -> bool:
+        """True only if unload_model synchronously releases this backend's model."""
+        return False
+
     @abstractmethod
     def load_model(self, model_id: str) -> float:
         """Make a model ready and return load time in seconds."""
@@ -50,4 +55,3 @@ class ModelBackend(ABC):
             top_p=top_p,
             extra=extra,
         )
-

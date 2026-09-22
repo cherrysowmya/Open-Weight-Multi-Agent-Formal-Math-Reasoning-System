@@ -10,6 +10,7 @@ import re
 from dataclasses import dataclass, asdict
 
 from .types import ChatMessage, IterationRecord, V4RequestRecord
+from .context_evidence import compact_declarations, compact_failures, failure_memory
 
 
 DISCUSSION_SYSTEM = """You are a mathematical discussion partner for a stuck Lean
@@ -48,21 +49,8 @@ class TaskPacket:
 
 
 def summarize_failures(records: list[IterationRecord], max_chars: int) -> tuple[str, tuple[int, ...]]:
-    """Extract recent rejection evidence; never summarize a model claim as a fact."""
-    parts: list[str] = []
-    sources: list[int] = []
-    for record in reversed(records):
-        if record.verification.valid:
-            continue
-        diagnostic = " ".join(" ".join(record.verification.diagnostics).split())[:400]
-        entry = f"Attempt {record.iteration}: {record.verification.failure_category.value}: {diagnostic}"
-        if not parts and len(entry) > max_chars:
-            entry = entry[:max_chars - 1] + "…"
-        if len("\n".join([entry, *parts])) > max_chars:
-            break
-        parts.insert(0, entry)
-        sources.insert(0, record.iteration)
-    return "\n".join(parts), tuple(sources)
+    """Keep rejected proof bodies paired with compiler errors, not conversations."""
+    return failure_memory(records, max_chars)
 
 
 def conservative_tokens(messages: tuple[ChatMessage, ...]) -> int:
@@ -88,9 +76,19 @@ def prepare_request(packet: TaskPacket, *, system: str, role: str, iteration: in
         if not compress or not optional:
             raise PacketBudgetError("The complete task and goal cannot fit the context budget; "
                                     "critical assumptions were not truncated")
-        key = max(optional, key=lambda key: len(fields[key].encode("utf-8")))
-        # Evidence is advisory; cut its payload, never the task or Lean goal.
-        fields[key] = fields[key][:len(fields[key]) // 2] if len(fields[key]) > 256 else ""
+        # Drop low-priority advisory context before rejection evidence. In
+        # particular, do not let verbose retrieval crowd out the latest error.
+        key = next(key for key in ("retrieved_declarations", "informal_outline",
+                   "discussion", "failed_attempts", "diagnostics") if fields[key])
+        limit = len(fields[key]) // 2
+        if key == "retrieved_declarations":
+            fields[key] = compact_declarations(fields[key], limit)
+        elif key == "failed_attempts":
+            fields[key] = compact_failures(fields[key], limit)
+        else:
+            # Do not turn a partial mathematical argument/JSON advice into a
+            # misleading complete one. Omit whole advisory fields as necessary.
+            fields[key] = ""
         if key not in changed:
             changed.append(key)
 

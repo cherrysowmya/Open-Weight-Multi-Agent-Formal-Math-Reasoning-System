@@ -16,9 +16,8 @@ def condition_config(config: AppConfig, condition: str) -> AppConfig:
         v4=replace(config.v4, enabled=condition != "v3",
             discussion_enabled=condition in {"v4", "discussion-only"},
             fresh_context_enabled=condition in {"v4", "fresh-only"}),
-        informal_reasoning=replace(config.informal_reasoning, enabled=True,
-            rewrite_salvage_enabled=False),
-        agent=replace(config.agent, fallback_enabled=False, unload_model_after_attempt=False))
+        informal_reasoning=replace(config.informal_reasoning, enabled=True),
+        agent=replace(config.agent, unload_model_after_attempt=False))
 
 
 def measurements(case: V3Case, result: AttemptResult) -> dict:

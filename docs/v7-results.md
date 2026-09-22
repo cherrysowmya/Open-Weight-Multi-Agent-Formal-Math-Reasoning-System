@@ -1,5 +1,9 @@
 # V7 implementation validation — 2026-09-10
 
+> Historical methodology notice: automatic tactic portfolios and prefix-salvage
+> trials have been removed. Related commands, settings and assisted scores below
+> describe older versions, not the current solver. See [agent-only repair](agent-only-repair.md).
+
 V7 MiniF2F ingestion, evaluation, checkpointing and independent proof auditing
 are implemented. This is not a completed full-split model evaluation and does
 not imply that V5/V6 are implemented.

@@ -1,0 +1,812 @@
+{
+  "dataset": "lean-intro-to-logic",
+  "repository": "https://github.com/Trequetrum/lean4game-logic",
+  "revision": "40ceec5f3ca5dce6cec2800b8f5e4927631ca2da",
+  "archive_sha256": "47560902fbef2ccc358608eb3b565c529494434395988f373f3e5a3d5aa15b56",
+  "upstream_toolchain": "leanprover/lean4:v4.7.0",
+  "adaptation": {
+    "statement_changes": false,
+    "theorem_names_assigned": true,
+    "imports": [
+      "Mathlib"
+    ],
+    "maxHeartbeats": 200000,
+    "game_tactic_restrictions_enforced": false,
+    "solutions_and_hints_included": false,
+    "autoImplicit": "Lean default; upstream unbound K in OrIntro/L02 preserved"
+  },
+  "cases": [
+    {
+      "id": "intro_logic_AndIntro_L01",
+      "world": "AndIntro",
+      "level": 1,
+      "path": "AndIntro/L01.lean",
+      "sha256": "60d97b99e357c2d6deb9a12f3540378971e5193757037f5320eb38d49bb17ccc",
+      "upstream_sha256": "385d60a8b65412e63cfc0f2bf5b034543b017d074ed8e09ed277c7615ffb2224",
+      "upstream_path": "Game/Levels/AndIntro/L01.lean"
+    },
+    {
+      "id": "intro_logic_AndIntro_L02",
+      "world": "AndIntro",
+      "level": 2,
+      "path": "AndIntro/L02.lean",
+      "sha256": "c4e1aa2791f9fe166e32565488bb0313922579b8356fb0eb37189514de799f34",
+      "upstream_sha256": "39d2d9e8ce27969ddf43aecb2f07c93b2f92cd1c4f1c30f3e27782878f5aac31",
+      "upstream_path": "Game/Levels/AndIntro/L02.lean"
+    },
+    {
+      "id": "intro_logic_AndIntro_L03",
+      "world": "AndIntro",
+      "level": 3,
+      "path": "AndIntro/L03.lean",
+      "sha256": "d3e6ac17af3d79ac317c6f1fc49d1c4ba776d13cfc274813d408e61b614c3eb9",
+      "upstream_sha256": "96945228bfdc1fb9eec14b65ca2cef66192a6616f972b2b259477185feba559c",
+      "upstream_path": "Game/Levels/AndIntro/L03.lean"
+    },
+    {
+      "id": "intro_logic_AndIntro_L04",
+      "world": "AndIntro",
+      "level": 4,
+      "path": "AndIntro/L04.lean",
+      "sha256": "8358170664755731eb8b5936924e722b580345405216ab90f1dd802764552d1d",
+      "upstream_sha256": "0472a401c1c691fbc63d80e6cd777a418429a87569bd15d06532a4dde2ac662e",
+      "upstream_path": "Game/Levels/AndIntro/L04.lean"
+    },
+    {
+      "id": "intro_logic_AndIntro_L05",
+      "world": "AndIntro",
+      "level": 5,
+      "path": "AndIntro/L05.lean",
+      "sha256": "43f1cba25544c5b6e676171b42fc561bbbeb938fcb800450e18b187092f2737e",
+      "upstream_sha256": "1fbf5aac5d493489d7a5ca6e2ba675cd250da27de563212f00b9d151dad9bf38",
+      "upstream_path": "Game/Levels/AndIntro/L05.lean"
+    },
+    {
+      "id": "intro_logic_AndIntro_L06",
+      "world": "AndIntro",
+      "level": 6,
+      "path": "AndIntro/L06.lean",
+      "sha256": "6ff6e95b16ffb140b56dc26f4b8c0a37bba276b94c3d9a17d66648c196536fb4",
+      "upstream_sha256": "3ec4cd3d0cd20a0316979a08ddac6e73e0c69299e1faa58db3cf8be16c063c65",
+      "upstream_path": "Game/Levels/AndIntro/L06.lean"
+    },
+    {
+      "id": "intro_logic_AndIntro_L07",
+      "world": "AndIntro",
+      "level": 7,
+      "path": "AndIntro/L07.lean",
+      "sha256": "56bd2945b717963a4ea1378fe46099d5f04aeed7a154a0fa94135291f36fe681",
+      "upstream_sha256": "5149e37a1f419d86cef54f7d77bb706b07d02787d76bb36c27ee7efec9b22b79",
+      "upstream_path": "Game/Levels/AndIntro/L07.lean"
+    },
+    {
+      "id": "intro_logic_AndIntro_L08",
+      "world": "AndIntro",
+      "level": 8,
+      "path": "AndIntro/L08.lean",
+      "sha256": "7e04ffcc4e1dfe98651694aa4ba7ec08c7506bf8df4c78141db683432570f637",
+      "upstream_sha256": "0834703295d7307caf2f68081cc8a5cb5f31648d0e57d3b57850f7ccff0b9868",
+      "upstream_path": "Game/Levels/AndIntro/L08.lean"
+    },
+    {
+      "id": "intro_logic_AndTactic_L01",
+      "world": "AndTactic",
+      "level": 1,
+      "path": "AndTactic/L01.lean",
+      "sha256": "47c09f7c99d4d565a05cef3205b261db9c54f53c72273dfd583fadfd53026b70",
+      "upstream_sha256": "d8dcf30cc4c18f705f5603bef33db63eaeb315ae36671f218f71a34541fbaddf",
+      "upstream_path": "Game/Levels/AndTactic/L01.lean"
+    },
+    {
+      "id": "intro_logic_AndTactic_L02",
+      "world": "AndTactic",
+      "level": 2,
+      "path": "AndTactic/L02.lean",
+      "sha256": "6b6b5abb85b2df2babf4f08ad25398c0e0b896bf105a0ffb0c6a3bcaeeb9a540",
+      "upstream_sha256": "9a7352b0f6098af9129e80b5469af21a4e0922b5c6d400f6371c550faaeaf621",
+      "upstream_path": "Game/Levels/AndTactic/L02.lean"
+    },
+    {
+      "id": "intro_logic_AndTactic_L03",
+      "world": "AndTactic",
+      "level": 3,
+      "path": "AndTactic/L03.lean",
+      "sha256": "1e0056a00053efdc3c5c1c461650a35216368600c129493589e9da2ad715c2bb",
+      "upstream_sha256": "63d3ed1f80f8f3a01e776972e14f7ab6da484ecefda154ca11a9b70dbafe50a1",
+      "upstream_path": "Game/Levels/AndTactic/L03.lean"
+    },
+    {
+      "id": "intro_logic_AndTactic_L04",
+      "world": "AndTactic",
+      "level": 4,
+      "path": "AndTactic/L04.lean",
+      "sha256": "21583a6cc5c222fe55953a9c55f9e3c7fbe81683461ec2fa96ba9b3c1f9f2fa7",
+      "upstream_sha256": "0acd7a5b434d2384949c4a88d41a49605fea320a4a6d0926b7f5db59da34ccb9",
+      "upstream_path": "Game/Levels/AndTactic/L04.lean"
+    },
+    {
+      "id": "intro_logic_AndTactic_L05",
+      "world": "AndTactic",
+      "level": 5,
+      "path": "AndTactic/L05.lean",
+      "sha256": "efdca8a3e64d137baf8e725d9f28a62a65d2e1c232860c6d35df0d5d6d6a9c25",
+      "upstream_sha256": "3964b289ace1122c627aa3a6fea000cd2e4c022d84019726e7c972550668cbd9",
+      "upstream_path": "Game/Levels/AndTactic/L05.lean"
+    },
+    {
+      "id": "intro_logic_AndTactic_L06",
+      "world": "AndTactic",
+      "level": 6,
+      "path": "AndTactic/L06.lean",
+      "sha256": "de5ee66a5b9d1808da8e18396a71a891dd0a616638b69d90da98cd3f887eb02e",
+      "upstream_sha256": "224e87419c18e054d658e3e330a4d0aee854766decb754f4db19807247d441c4",
+      "upstream_path": "Game/Levels/AndTactic/L06.lean"
+    },
+    {
+      "id": "intro_logic_AndTactic_L07",
+      "world": "AndTactic",
+      "level": 7,
+      "path": "AndTactic/L07.lean",
+      "sha256": "44d59777c928503ad6922f6ad65e2b4dd862ad7db85618216c97b03d48fcaf94",
+      "upstream_sha256": "1edabaf47057daa161145eeff4ae323baae3924692565da5ce6ed1252f38246f",
+      "upstream_path": "Game/Levels/AndTactic/L07.lean"
+    },
+    {
+      "id": "intro_logic_AndTactic_L08",
+      "world": "AndTactic",
+      "level": 8,
+      "path": "AndTactic/L08.lean",
+      "sha256": "04f6cd3bd600253f0e893299f4b1795e58dc46cf25aec391917ea724a76a9af4",
+      "upstream_sha256": "efa088d4be52064d40a4335e842c21e650f03cb81a514c3909abfbe1aa942e95",
+      "upstream_path": "Game/Levels/AndTactic/L08.lean"
+    },
+    {
+      "id": "intro_logic_ImpIntro_L01",
+      "world": "ImpIntro",
+      "level": 1,
+      "path": "ImpIntro/L01.lean",
+      "sha256": "c6944726b21dcb965b5919e33ec47a9e02b573599da0356dce501c59a9e6b992",
+      "upstream_sha256": "133df678ff0d9ed983f6234cfd26d7d5441eed005770157817987163a5dfe396",
+      "upstream_path": "Game/Levels/ImpIntro/L01.lean"
+    },
+    {
+      "id": "intro_logic_ImpIntro_L02",
+      "world": "ImpIntro",
+      "level": 2,
+      "path": "ImpIntro/L02.lean",
+      "sha256": "68aa3276ee504b3d29b68d1b9ccefb1531a79f8cd9da5f613f7f6006fd98e1a8",
+      "upstream_sha256": "1be23dd41a765957f8e52d3b7e448ed1d0b522b2e8d9e9d178826ebf847d6e7f",
+      "upstream_path": "Game/Levels/ImpIntro/L02.lean"
+    },
+    {
+      "id": "intro_logic_ImpIntro_L03",
+      "world": "ImpIntro",
+      "level": 3,
+      "path": "ImpIntro/L03.lean",
+      "sha256": "81e5d094b4736fb8cb5999c068e555de4f195061c27cb37206005d3986198438",
+      "upstream_sha256": "dee3efeb85282470085fd1ced877cc16058ee5a7ef74f2a099fa87f2c7fefd8b",
+      "upstream_path": "Game/Levels/ImpIntro/L03.lean"
+    },
+    {
+      "id": "intro_logic_ImpIntro_L04",
+      "world": "ImpIntro",
+      "level": 4,
+      "path": "ImpIntro/L04.lean",
+      "sha256": "393f1de1c14eaef9cd6b1e0bd2c1cbc6ff6a2b8ea860588d7a96c336bf0d65d2",
+      "upstream_sha256": "e74b9dcb92130f7f80489a3f59c0a71d4e9e8b80eacb800e459a5d56b7a9818d",
+      "upstream_path": "Game/Levels/ImpIntro/L04.lean"
+    },
+    {
+      "id": "intro_logic_ImpIntro_L05",
+      "world": "ImpIntro",
+      "level": 5,
+      "path": "ImpIntro/L05.lean",
+      "sha256": "7b3ef2bd5ab1761771f380d3f1b27fa4cb4ce74a8a2254554a04ff206bb95655",
+      "upstream_sha256": "ab74b7798268f3bc9b886f7dd4ae17e8e1265627ad5e04cdd6996a190575e7fc",
+      "upstream_path": "Game/Levels/ImpIntro/L05.lean"
+    },
+    {
+      "id": "intro_logic_ImpIntro_L06",
+      "world": "ImpIntro",
+      "level": 6,
+      "path": "ImpIntro/L06.lean",
+      "sha256": "67177a68458118b8121169fc35ba477eb9a41a5c2339761f509036fbe4e95e6c",
+      "upstream_sha256": "91e6c9a22ababbc920a8236451499b3328e20a332d3b206fd2166c7b00fb4d68",
+      "upstream_path": "Game/Levels/ImpIntro/L06.lean"
+    },
+    {
+      "id": "intro_logic_ImpIntro_L07",
+      "world": "ImpIntro",
+      "level": 7,
+      "path": "ImpIntro/L07.lean",
+      "sha256": "8a3703022eb95fcc059cd697d1656e35aada2ef87db9aa0dad0b7a92d3b678c7",
+      "upstream_sha256": "47d35893880ae3806711ec99e63847ff6c357f18aec2c867c1b4dd5d41072cf3",
+      "upstream_path": "Game/Levels/ImpIntro/L07.lean"
+    },
+    {
+      "id": "intro_logic_ImpIntro_L08",
+      "world": "ImpIntro",
+      "level": 8,
+      "path": "ImpIntro/L08.lean",
+      "sha256": "4d6c04f3d8c2ca5e181e285abed8cc023c1e70c4b12438144ada11e1cd1a4d83",
+      "upstream_sha256": "945335c86b09b539dd778c12ef14fbc19199f6b9ac224c167e9d3baeeb303ff2",
+      "upstream_path": "Game/Levels/ImpIntro/L08.lean"
+    },
+    {
+      "id": "intro_logic_ImpIntro_L09",
+      "world": "ImpIntro",
+      "level": 9,
+      "path": "ImpIntro/L09.lean",
+      "sha256": "8389e9191f1004867e71864c0388db7714bbe7aabe9faade2cb28a0041da657f",
+      "upstream_sha256": "c383957a48a11f5011ce2e5decef9981432a6966bfac6323554b46c6f544b390",
+      "upstream_path": "Game/Levels/ImpIntro/L09.lean"
+    },
+    {
+      "id": "intro_logic_ImpTactic_L01",
+      "world": "ImpTactic",
+      "level": 1,
+      "path": "ImpTactic/L01.lean",
+      "sha256": "625b7c3df6e0c1e99f815a4d8e4138d6af60903f8970d855e036fd3a5e9c83b1",
+      "upstream_sha256": "7aa67bdaf01f66ce0e273414d72858d3d399290c5964e9e52209f7a6277597ee",
+      "upstream_path": "Game/Levels/ImpTactic/L01.lean"
+    },
+    {
+      "id": "intro_logic_ImpTactic_L02",
+      "world": "ImpTactic",
+      "level": 2,
+      "path": "ImpTactic/L02.lean",
+      "sha256": "678c5d897b7bd49a5af1f762bc88fb7393328319f1067256122e641eaecfa822",
+      "upstream_sha256": "dd8757c667ddd5e3ccb322f90efac2db3a3689468c69cb031a2c7002e87e3f1c",
+      "upstream_path": "Game/Levels/ImpTactic/L02.lean"
+    },
+    {
+      "id": "intro_logic_ImpTactic_L03",
+      "world": "ImpTactic",
+      "level": 3,
+      "path": "ImpTactic/L03.lean",
+      "sha256": "f681bb2b32c1cc05547a7418e7cdeba14497555ecafb82259d1196af950353cb",
+      "upstream_sha256": "637b44d405b17c25e06177967da85ec0e3623b5a65ffa409e60d5f7883bd0a90",
+      "upstream_path": "Game/Levels/ImpTactic/L03.lean"
+    },
+    {
+      "id": "intro_logic_ImpTactic_L04",
+      "world": "ImpTactic",
+      "level": 4,
+      "path": "ImpTactic/L04.lean",
+      "sha256": "30079d74a1eb726a574da13b4adc14b98cc57ba1d091a17ccf5f855d9bf10983",
+      "upstream_sha256": "03f402c27c8cc38afe79c0f1905826802c148f4ebbbd257093f56595a9903c90",
+      "upstream_path": "Game/Levels/ImpTactic/L04.lean"
+    },
+    {
+      "id": "intro_logic_ImpTactic_L05",
+      "world": "ImpTactic",
+      "level": 5,
+      "path": "ImpTactic/L05.lean",
+      "sha256": "f9c0d0f9df8ff6118965f2b6624d195a29e9bca40681c50f9c542b21050152a8",
+      "upstream_sha256": "fe871195e181714ea96556563ba9c2e0972eaed7de9bd47ba46008345af3a94b",
+      "upstream_path": "Game/Levels/ImpTactic/L05.lean"
+    },
+    {
+      "id": "intro_logic_ImpTactic_L06",
+      "world": "ImpTactic",
+      "level": 6,
+      "path": "ImpTactic/L06.lean",
+      "sha256": "36c18d50cc94cfe788648e8b888caf8459f1daa10b0058aba8be84179007f365",
+      "upstream_sha256": "cf6c6f1cf0414f3f358c37a8efed59ec900aee8755bfc0aca45aca1b71633f6b",
+      "upstream_path": "Game/Levels/ImpTactic/L06.lean"
+    },
+    {
+      "id": "intro_logic_ImpTactic_L07",
+      "world": "ImpTactic",
+      "level": 7,
+      "path": "ImpTactic/L07.lean",
+      "sha256": "dd5c93f9373e810d41cd55d534dfc662a4991c4a09de7cc467e33f7807b9f52a",
+      "upstream_sha256": "9d0492eab0cf71314c931cc60a0a2de3d01f011026bb7fc3e9529188419253f1",
+      "upstream_path": "Game/Levels/ImpTactic/L07.lean"
+    },
+    {
+      "id": "intro_logic_ImpTactic_L08",
+      "world": "ImpTactic",
+      "level": 8,
+      "path": "ImpTactic/L08.lean",
+      "sha256": "cd00b51e127d31c0d5908d356133a1b7573b22558448ea89e4aadab2f78c1b06",
+      "upstream_sha256": "1e0b83319d11acc498a7516385baa2138d70d805e7baf7404ec3bd923a0708b0",
+      "upstream_path": "Game/Levels/ImpTactic/L08.lean"
+    },
+    {
+      "id": "intro_logic_ImpTactic_L09",
+      "world": "ImpTactic",
+      "level": 9,
+      "path": "ImpTactic/L09.lean",
+      "sha256": "5b78c3386eeac5b75c97de6c99d09f79532d66c8f428db72937808cd46848e73",
+      "upstream_sha256": "82e1c266cd4dbb43986a8349f5f72500463d70ace64e864044fd73f2d436b1bb",
+      "upstream_path": "Game/Levels/ImpTactic/L09.lean"
+    },
+    {
+      "id": "intro_logic_NotIntro_L01",
+      "world": "NotIntro",
+      "level": 1,
+      "path": "NotIntro/L01.lean",
+      "sha256": "cb587ea4a9097aaf43c0ed49afff5e019f1d9fd754e94c5d641e41c24c765028",
+      "upstream_sha256": "97783fb5a45edf4368ad0e5e6a982746532e15fe0d50124bb04cca20011af6e8",
+      "upstream_path": "Game/Levels/NotIntro/L01.lean"
+    },
+    {
+      "id": "intro_logic_NotIntro_L02",
+      "world": "NotIntro",
+      "level": 2,
+      "path": "NotIntro/L02.lean",
+      "sha256": "2d0fa25da2e84d04dd5dd94ba037a27c76d247aac74a94d3c5f7042a0d7db649",
+      "upstream_sha256": "b58c462779b6daffcc00b00fcdf6c33847e02529e6211ec05464401ea4de18d7",
+      "upstream_path": "Game/Levels/NotIntro/L02.lean"
+    },
+    {
+      "id": "intro_logic_NotIntro_L03",
+      "world": "NotIntro",
+      "level": 3,
+      "path": "NotIntro/L03.lean",
+      "sha256": "e86c10ff8fddac65677b2269733ed328b2b6aacd794bca880b7137e19f6f764a",
+      "upstream_sha256": "8ab7f34cee36203a9de18c4b88af86b9d93bde9dce89633e4533ced1f887eda6",
+      "upstream_path": "Game/Levels/NotIntro/L03.lean"
+    },
+    {
+      "id": "intro_logic_NotIntro_L04",
+      "world": "NotIntro",
+      "level": 4,
+      "path": "NotIntro/L04.lean",
+      "sha256": "e512488cca0d7e627b783812dc5dc716072356532ec8d8bbc1023510af9291de",
+      "upstream_sha256": "226c07ebcf1b53ec133d2dadb7ffc8a9ea645020915b49bf5a1b3a08841302aa",
+      "upstream_path": "Game/Levels/NotIntro/L04.lean"
+    },
+    {
+      "id": "intro_logic_NotIntro_L05",
+      "world": "NotIntro",
+      "level": 5,
+      "path": "NotIntro/L05.lean",
+      "sha256": "2acac061eb5dfbf0f623fdec850692bdfc76d7c7e1b7c4dafb4e412c7ea3a12d",
+      "upstream_sha256": "c5b12fe30dbf0ec5df19207cd11037b0e5005e693af469c438233126bbe0bab8",
+      "upstream_path": "Game/Levels/NotIntro/L05.lean"
+    },
+    {
+      "id": "intro_logic_NotIntro_L06",
+      "world": "NotIntro",
+      "level": 6,
+      "path": "NotIntro/L06.lean",
+      "sha256": "1fba3a254bae536a03e0086685592b74da74f52b079711006fe4976219dd141e",
+      "upstream_sha256": "291ada3c5f223eaf3b5ae0444c1b069cda3663aecb59bc73fa63c91e66a67449",
+      "upstream_path": "Game/Levels/NotIntro/L06.lean"
+    },
+    {
+      "id": "intro_logic_NotIntro_L07",
+      "world": "NotIntro",
+      "level": 7,
+      "path": "NotIntro/L07.lean",
+      "sha256": "96209c64f1fe787db58f8f86a8da22a234480b9470dad9a2eb65481694396943",
+      "upstream_sha256": "e098d3b2bcc19b0b5e8e4c0ae83b448ffb2929eaa3d4cfc4d6ef724605cbb72b",
+      "upstream_path": "Game/Levels/NotIntro/L07.lean"
+    },
+    {
+      "id": "intro_logic_NotIntro_L08",
+      "world": "NotIntro",
+      "level": 8,
+      "path": "NotIntro/L08.lean",
+      "sha256": "d9e86d0839e646d0f49787c1f3156a5911e8585ced5bddf92b53f7428c443d4d",
+      "upstream_sha256": "1a6566093d5a342ce9e4cde3a43cc357df0ab1e3c04a1f6ce34a0746edf3dec6",
+      "upstream_path": "Game/Levels/NotIntro/L08.lean"
+    },
+    {
+      "id": "intro_logic_NotIntro_L09",
+      "world": "NotIntro",
+      "level": 9,
+      "path": "NotIntro/L09.lean",
+      "sha256": "10771ea5d0dadf6ac7ec031bf022ee7ea0b2c986162e3e53ad17cf316e950df9",
+      "upstream_sha256": "f2c7f737e0f4e91ce7e93ef679ac73733600f4108be2f4bdc187706709a75247",
+      "upstream_path": "Game/Levels/NotIntro/L09.lean"
+    },
+    {
+      "id": "intro_logic_NotIntro_L10",
+      "world": "NotIntro",
+      "level": 10,
+      "path": "NotIntro/L10.lean",
+      "sha256": "de02b98a0d9dd1053d736824fd60f6d77f3b6c2a0b9bc2d02e1621b95945a167",
+      "upstream_sha256": "f030def9acf1b3f454fda99e64193a769389627faac4ed0b016d84eff05d6746",
+      "upstream_path": "Game/Levels/NotIntro/L10.lean"
+    },
+    {
+      "id": "intro_logic_NotIntro_L11",
+      "world": "NotIntro",
+      "level": 11,
+      "path": "NotIntro/L11.lean",
+      "sha256": "bf45246ef1f7e0732d5fc0ab3a10808a714645d156854bca84e38c652d18522d",
+      "upstream_sha256": "d117fd1eb07652a3645252a30c2dea8d3ef1700640c8db826ab2f637700150af",
+      "upstream_path": "Game/Levels/NotIntro/L11.lean"
+    },
+    {
+      "id": "intro_logic_NotIntro_L12",
+      "world": "NotIntro",
+      "level": 12,
+      "path": "NotIntro/L12.lean",
+      "sha256": "cbf3e16590bb87cccbc984a31f3f98a544ce2150d16cd99d7d49295114c8d027",
+      "upstream_sha256": "6fa76f968c542a34973007d4c9db59c60d0186229b436ed190d377f09e600fc2",
+      "upstream_path": "Game/Levels/NotIntro/L12.lean"
+    },
+    {
+      "id": "intro_logic_NotTactic_L01",
+      "world": "NotTactic",
+      "level": 1,
+      "path": "NotTactic/L01.lean",
+      "sha256": "b8135d72e44875b498d3cee58c89e2b05e7116618bbc9597e57cdd6bc4518da0",
+      "upstream_sha256": "3b3298d3b1ad12f56cb929f6b23e9a9ba943124d5ed466d6594ef8547760997e",
+      "upstream_path": "Game/Levels/NotTactic/L01.lean"
+    },
+    {
+      "id": "intro_logic_NotTactic_L02",
+      "world": "NotTactic",
+      "level": 2,
+      "path": "NotTactic/L02.lean",
+      "sha256": "b04e98d6e8ece4d80c471f122745689e8cbc239eb77f922a7cdeab296886c641",
+      "upstream_sha256": "49ad7a639cbd1fcb0c8e002fd69cdf310c325c57b49772a115a1b88a6f6d144a",
+      "upstream_path": "Game/Levels/NotTactic/L02.lean"
+    },
+    {
+      "id": "intro_logic_NotTactic_L03",
+      "world": "NotTactic",
+      "level": 3,
+      "path": "NotTactic/L03.lean",
+      "sha256": "cc599c14a68a4213b7bd2f0c6e78381ead10ebc64561bb9380a5f53fe8b16280",
+      "upstream_sha256": "0906bc052b7080f77504b0fda171cb7b10613cce73b4ffe00080b8f7d54b759e",
+      "upstream_path": "Game/Levels/NotTactic/L03.lean"
+    },
+    {
+      "id": "intro_logic_NotTactic_L04",
+      "world": "NotTactic",
+      "level": 4,
+      "path": "NotTactic/L04.lean",
+      "sha256": "809df47f966609ce2488d3644b1b3499e90b722a226d2e6f5660d1ec41876972",
+      "upstream_sha256": "9a5d5ac2a2cd0298826c60a329b0a87e1e977c66c8e6ebc2d2995bb79b850256",
+      "upstream_path": "Game/Levels/NotTactic/L04.lean"
+    },
+    {
+      "id": "intro_logic_NotTactic_L05",
+      "world": "NotTactic",
+      "level": 5,
+      "path": "NotTactic/L05.lean",
+      "sha256": "70076da81d5fcce3482ffcedc3df8c751cdb1b1e33279b40c79a8a3cb88e555b",
+      "upstream_sha256": "7367dbdb0d6dddc769468173df56805bee96a40ca7eae68e30a962a66525a10f",
+      "upstream_path": "Game/Levels/NotTactic/L05.lean"
+    },
+    {
+      "id": "intro_logic_NotTactic_L06",
+      "world": "NotTactic",
+      "level": 6,
+      "path": "NotTactic/L06.lean",
+      "sha256": "b11ebd616ff877e36a5de7d13babe4ca43e040ded2b03b8a788271a26d448288",
+      "upstream_sha256": "20b26e1c5e87b281dd958c4645ff134a61152257adc2e417258a3ba738b9efd8",
+      "upstream_path": "Game/Levels/NotTactic/L06.lean"
+    },
+    {
+      "id": "intro_logic_NotTactic_L07",
+      "world": "NotTactic",
+      "level": 7,
+      "path": "NotTactic/L07.lean",
+      "sha256": "42788956d15fe5c179b5648c8a6bb19a2a9cb7d74035df64abbd97df6f7425d1",
+      "upstream_sha256": "e86813a5c364ad4d94ab7d20c0d2656d9c5cf2e0177cf04eae7f00dc5aeea519",
+      "upstream_path": "Game/Levels/NotTactic/L07.lean"
+    },
+    {
+      "id": "intro_logic_NotTactic_L08",
+      "world": "NotTactic",
+      "level": 8,
+      "path": "NotTactic/L08.lean",
+      "sha256": "4705d4a0b44eab56dbc4a866f7f56882e3a3bb76b248ce5d0cb58b59a6721ba5",
+      "upstream_sha256": "619078a6587d2c66dfba4babdf029094fc15bf7df1a23d00549a775971f6cd05",
+      "upstream_path": "Game/Levels/NotTactic/L08.lean"
+    },
+    {
+      "id": "intro_logic_NotTactic_L09",
+      "world": "NotTactic",
+      "level": 9,
+      "path": "NotTactic/L09.lean",
+      "sha256": "97ada329ff384090934c12f581b3025f9ead3981ed2713bd8279ef4646022e35",
+      "upstream_sha256": "30b71a90d432b2c4f9173b51ce18a49549a57ae3d6f7bc9dd2eac6dc397478b7",
+      "upstream_path": "Game/Levels/NotTactic/L09.lean"
+    },
+    {
+      "id": "intro_logic_NotTactic_L10",
+      "world": "NotTactic",
+      "level": 10,
+      "path": "NotTactic/L10.lean",
+      "sha256": "329278c07f3e61b2dbc53a2a8ed16c4d1a80a25620e3a821e66a4b65c2792885",
+      "upstream_sha256": "4c3dfd44fd416c59e729ad2d60193edefde152b1da9ae38ae2c9ea8a1b80b618",
+      "upstream_path": "Game/Levels/NotTactic/L10.lean"
+    },
+    {
+      "id": "intro_logic_NotTactic_L11",
+      "world": "NotTactic",
+      "level": 11,
+      "path": "NotTactic/L11.lean",
+      "sha256": "815b9b776e5d27089e0d5737308ec0c9cab9398b42aaa970fc3139950ab94065",
+      "upstream_sha256": "20b85c111be5df1f373b1d73c3423618fd8edb93bcf86ac5fbda94001b04cde8",
+      "upstream_path": "Game/Levels/NotTactic/L11.lean"
+    },
+    {
+      "id": "intro_logic_NotTactic_L12",
+      "world": "NotTactic",
+      "level": 12,
+      "path": "NotTactic/L12.lean",
+      "sha256": "26418b6db1150beb06e8b9b28b1efc9b7dd05dda72557af620565ed04a662226",
+      "upstream_sha256": "27b36184738d63e33c7ba532b534d94f127ec2cb3530411644ba68adf826e2b7",
+      "upstream_path": "Game/Levels/NotTactic/L12.lean"
+    },
+    {
+      "id": "intro_logic_OrIntro_L01",
+      "world": "OrIntro",
+      "level": 1,
+      "path": "OrIntro/L01.lean",
+      "sha256": "60c71bd7ce32051c991cf893216798c188fa2dd464b1dfe912d2bed1f541296b",
+      "upstream_sha256": "40819a1f66a5fceacf89d02e27613170bbd627ee1fa857c66bbb9e72f53e6c50",
+      "upstream_path": "Game/Levels/OrIntro/L01.lean"
+    },
+    {
+      "id": "intro_logic_OrIntro_L02",
+      "world": "OrIntro",
+      "level": 2,
+      "path": "OrIntro/L02.lean",
+      "sha256": "fa2e1ce200a47739451adbfd2d6f68771497b05ddb9c95ed21e8ae76784af2e9",
+      "upstream_sha256": "074ebc2c5b703567ec041a0aa1afad9d3a7c9304d7166015f157958253978e9b",
+      "upstream_path": "Game/Levels/OrIntro/L02.lean"
+    },
+    {
+      "id": "intro_logic_OrIntro_L03",
+      "world": "OrIntro",
+      "level": 3,
+      "path": "OrIntro/L03.lean",
+      "sha256": "0aea2a7f18f340fd4d9d84b0d91bbe1339231ab5bdba8f9189a6db579ae7ef71",
+      "upstream_sha256": "4952d3a28fc24171f018340959a1509c193b593a94714557205b1c65fc2e5f78",
+      "upstream_path": "Game/Levels/OrIntro/L03.lean"
+    },
+    {
+      "id": "intro_logic_OrIntro_L04",
+      "world": "OrIntro",
+      "level": 4,
+      "path": "OrIntro/L04.lean",
+      "sha256": "3d07aad94603c15c0fa72c014166e1f70330558a3b40f9ca0763e10f6880d138",
+      "upstream_sha256": "5691ae4562225bbcefc02e657c02feffba1890ec73528e6e7a8c1b1e82346da6",
+      "upstream_path": "Game/Levels/OrIntro/L04.lean"
+    },
+    {
+      "id": "intro_logic_OrIntro_L05",
+      "world": "OrIntro",
+      "level": 5,
+      "path": "OrIntro/L05.lean",
+      "sha256": "801af22fcf49d2f7c3747320ef1fc7b8746aa08023f265d49574ea48a5613c53",
+      "upstream_sha256": "16abdc2bee5dcb3517e32f714cf57156447aba4a8fd1e025bc2af469f8107d84",
+      "upstream_path": "Game/Levels/OrIntro/L05.lean"
+    },
+    {
+      "id": "intro_logic_OrIntro_L06",
+      "world": "OrIntro",
+      "level": 6,
+      "path": "OrIntro/L06.lean",
+      "sha256": "5bf68a5e382edd0c00094ea78df3d5a3b9ed2bf992efff2d51e76573eba0a71b",
+      "upstream_sha256": "b87d11eb853919dc058aa980a70a8a78854e1ea8a2e56d7a8990be4d14e120dc",
+      "upstream_path": "Game/Levels/OrIntro/L06.lean"
+    },
+    {
+      "id": "intro_logic_OrIntro_L07",
+      "world": "OrIntro",
+      "level": 7,
+      "path": "OrIntro/L07.lean",
+      "sha256": "9829ac1e42467eb5c64d8832162c3005adedb09076d408ec32aa69900e68ae85",
+      "upstream_sha256": "31034594f3fe569702260ea23e4e55690f08d370195f779e2ec0bc0b37e63125",
+      "upstream_path": "Game/Levels/OrIntro/L07.lean"
+    },
+    {
+      "id": "intro_logic_OrIntro_L08",
+      "world": "OrIntro",
+      "level": 8,
+      "path": "OrIntro/L08.lean",
+      "sha256": "20fff8c6ecf847e6ee9dda992558d1954472a92ee17ab4851406cf7c23c90ba8",
+      "upstream_sha256": "d27477990faf3ee3456a4b709a7ba899785985f90f1e93fa2c2d098beb155827",
+      "upstream_path": "Game/Levels/OrIntro/L08.lean"
+    },
+    {
+      "id": "intro_logic_OrTactic_L01",
+      "world": "OrTactic",
+      "level": 1,
+      "path": "OrTactic/L01.lean",
+      "sha256": "8cb03e146a1147a51384b0564f98facd18e7119a8d48d66b1c1db365aa129322",
+      "upstream_sha256": "886f56713abd6670c5ccc673505b473719b9530e197e43c5cb2ae3007d965596",
+      "upstream_path": "Game/Levels/OrTactic/L01.lean"
+    },
+    {
+      "id": "intro_logic_OrTactic_L02",
+      "world": "OrTactic",
+      "level": 2,
+      "path": "OrTactic/L02.lean",
+      "sha256": "99dddeb8627451b2ac686018418a47ab0c4261ee61bf1d685ee34e3e3b089b71",
+      "upstream_sha256": "57cd71d57c25e2d7b8f9a4868d8a2e407eb51354437855a1db4307fd9b4b53b9",
+      "upstream_path": "Game/Levels/OrTactic/L02.lean"
+    },
+    {
+      "id": "intro_logic_OrTactic_L03",
+      "world": "OrTactic",
+      "level": 3,
+      "path": "OrTactic/L03.lean",
+      "sha256": "d97333ac6855541a8ff10d60213c363c138d24d43ccabfa8f31ce95727cccdf2",
+      "upstream_sha256": "d1f0bfc206866402ccadd929d46746cea5ae8d7f462be85635e8037d547620a5",
+      "upstream_path": "Game/Levels/OrTactic/L03.lean"
+    },
+    {
+      "id": "intro_logic_OrTactic_L04",
+      "world": "OrTactic",
+      "level": 4,
+      "path": "OrTactic/L04.lean",
+      "sha256": "c4f905deb2530387a7e4a2d2482715f2cbf75ad38f842aab67a6f54f2989a5ef",
+      "upstream_sha256": "2ed93da8eb4b78a2e5ec375d47dfec76ca59cf77322af8af84a26abf221c48b8",
+      "upstream_path": "Game/Levels/OrTactic/L04.lean"
+    },
+    {
+      "id": "intro_logic_OrTactic_L05",
+      "world": "OrTactic",
+      "level": 5,
+      "path": "OrTactic/L05.lean",
+      "sha256": "1be88f73eb9674e6ecfb33668f7221f39d949a10cdf827b7aeb9532250b24f86",
+      "upstream_sha256": "20f655760cff5150cf1a134ada1a94ef8822c0ed486d6549884960f93fca2521",
+      "upstream_path": "Game/Levels/OrTactic/L05.lean"
+    },
+    {
+      "id": "intro_logic_OrTactic_L06",
+      "world": "OrTactic",
+      "level": 6,
+      "path": "OrTactic/L06.lean",
+      "sha256": "67ad3940422e417f3e6596ba54005f95c88294b9abc9c7a2483b4f72c2d4f598",
+      "upstream_sha256": "811b66d7a91ca70fd6dcc3ae329e314ac5dae200390970a10770f2685a8a14c3",
+      "upstream_path": "Game/Levels/OrTactic/L06.lean"
+    },
+    {
+      "id": "intro_logic_OrTactic_L07",
+      "world": "OrTactic",
+      "level": 7,
+      "path": "OrTactic/L07.lean",
+      "sha256": "ca34d3ff6f8389a81661e90182c3421a68b15c3b464fe0a3e40465669d37bbe2",
+      "upstream_sha256": "94c676007cb08d65840062099c4fde603be05e34c614b017501c10023a717aaa",
+      "upstream_path": "Game/Levels/OrTactic/L07.lean"
+    },
+    {
+      "id": "intro_logic_OrTactic_L08",
+      "world": "OrTactic",
+      "level": 8,
+      "path": "OrTactic/L08.lean",
+      "sha256": "4c2bbb73367fea8cb489a5b6a8829b6fba5f112b255c3616f53d99570dcf74f0",
+      "upstream_sha256": "52c26ca2fd8447c6628a3870f55779e309ae302a0b8d18245bb9c99fadeeba7a",
+      "upstream_path": "Game/Levels/OrTactic/L08.lean"
+    },
+    {
+      "id": "intro_logic_IffIntro_L01",
+      "world": "IffIntro",
+      "level": 1,
+      "path": "IffIntro/L01.lean",
+      "sha256": "167d8c63a3aaf3d7b10c2a82b9b35813ce8077cfa5e8dce23ef075540598317d",
+      "upstream_sha256": "310f110f104a4cfe2277a2658423602ad4e3a65246516ab8c1b7894747bc1fd0",
+      "upstream_path": "Game/Levels/IffIntro/L01.lean"
+    },
+    {
+      "id": "intro_logic_IffIntro_L02",
+      "world": "IffIntro",
+      "level": 2,
+      "path": "IffIntro/L02.lean",
+      "sha256": "b6b3a12c26229757dd52e0ab8443bb90cf27c00e579a5ce1523d5bc0691c33b0",
+      "upstream_sha256": "89ec3d5af9a239a8e9616558b4d76bfd8415a39da7bfc91e7ad4d29a76c33c2a",
+      "upstream_path": "Game/Levels/IffIntro/L02.lean"
+    },
+    {
+      "id": "intro_logic_IffIntro_L03",
+      "world": "IffIntro",
+      "level": 3,
+      "path": "IffIntro/L03.lean",
+      "sha256": "95a12ea67d5d0bc0bee5184fea04c42fc69796cbdf1d904a6e0334be03cc90d6",
+      "upstream_sha256": "ed64b5b1a1295a04c339306f7989d6cdcfd548feda871a84e515256c2692aadd",
+      "upstream_path": "Game/Levels/IffIntro/L03.lean"
+    },
+    {
+      "id": "intro_logic_IffIntro_L04",
+      "world": "IffIntro",
+      "level": 4,
+      "path": "IffIntro/L04.lean",
+      "sha256": "42978695f063f4647f908810099f6f5b87412ddd039cb7d7f977c7162e2178a6",
+      "upstream_sha256": "56ce8d0a753c22373b1a529eac06764574af12fa2dfdd3b66e4b9dd45a695b44",
+      "upstream_path": "Game/Levels/IffIntro/L04.lean"
+    },
+    {
+      "id": "intro_logic_IffIntro_L05",
+      "world": "IffIntro",
+      "level": 5,
+      "path": "IffIntro/L05.lean",
+      "sha256": "25236bcf1e33db1a88663f265e79b4dfdb8ca2928934886aadb53a5d09583019",
+      "upstream_sha256": "eead48553052816ae41f5114dee2c5e7f67c541f83c3410496f27298a0ce8578",
+      "upstream_path": "Game/Levels/IffIntro/L05.lean"
+    },
+    {
+      "id": "intro_logic_IffIntro_L06",
+      "world": "IffIntro",
+      "level": 6,
+      "path": "IffIntro/L06.lean",
+      "sha256": "44b0cb8e4392b0f3c4ca926cf71eb187f989f0e420a4a79a8689844fb1c5185b",
+      "upstream_sha256": "f86db90c17583b0316866061c662be2fc9a2c5ed70f0a01f4320055819d9850a",
+      "upstream_path": "Game/Levels/IffIntro/L06.lean"
+    },
+    {
+      "id": "intro_logic_IffIntro_L07",
+      "world": "IffIntro",
+      "level": 7,
+      "path": "IffIntro/L07.lean",
+      "sha256": "82b9e5963275e60fea446f21a7684b8ba9be5b4d706625fa6a2189bc13cb5010",
+      "upstream_sha256": "ab59fdd6ff075b41606af015fc0f0ba0ca93f9c93328b0050c4ac45fc6ca0341",
+      "upstream_path": "Game/Levels/IffIntro/L07.lean"
+    },
+    {
+      "id": "intro_logic_IffTactic_L01",
+      "world": "IffTactic",
+      "level": 1,
+      "path": "IffTactic/L01.lean",
+      "sha256": "ac52665a021092d362ca0b39300c4a9261be8a639fdb234ba3d8c3c1f3c5b951",
+      "upstream_sha256": "abde07910a9bb5ddd7c926a854185a0cff29d1bec53efcf5225dce2a82271bc9",
+      "upstream_path": "Game/Levels/IffTactic/L01.lean"
+    },
+    {
+      "id": "intro_logic_IffTactic_L02",
+      "world": "IffTactic",
+      "level": 2,
+      "path": "IffTactic/L02.lean",
+      "sha256": "13a425d8de24ecf971fa4a823f5f29fc0ec140fd31c6792b22ce24aa82e4902f",
+      "upstream_sha256": "42eb13cbe82db3671206aebf81ed78ce3c2b0c31649c69f5fc014ed9f2ba366d",
+      "upstream_path": "Game/Levels/IffTactic/L02.lean"
+    },
+    {
+      "id": "intro_logic_IffTactic_L03",
+      "world": "IffTactic",
+      "level": 3,
+      "path": "IffTactic/L03.lean",
+      "sha256": "5583f9cab0a989a68bf46d659c19b49fec97dc30a2068c00f63d7fc54b3d8c81",
+      "upstream_sha256": "148c1f0cb1b67a0773038d89f0c5776fb2c8f83278a6cde66917e6c27fc9c981",
+      "upstream_path": "Game/Levels/IffTactic/L03.lean"
+    },
+    {
+      "id": "intro_logic_IffTactic_L04",
+      "world": "IffTactic",
+      "level": 4,
+      "path": "IffTactic/L04.lean",
+      "sha256": "48b1afee974c43972f00edff8a160636dada15f98becad994297cb2787cd0f0e",
+      "upstream_sha256": "92cd55fd7e04b740f7366e8e991088f05caf8bc8933f78f5f22a361bf6e0cc32",
+      "upstream_path": "Game/Levels/IffTactic/L04.lean"
+    },
+    {
+      "id": "intro_logic_IffTactic_L05",
+      "world": "IffTactic",
+      "level": 5,
+      "path": "IffTactic/L05.lean",
+      "sha256": "80c62133c9550d8d2b4cdfa1c57282c984c2ab3cf479e2c8804ee8b5fedb851a",
+      "upstream_sha256": "2e8d165327c194732775464d08566fcb492f90a7ef5ba7fd9975c154856d1075",
+      "upstream_path": "Game/Levels/IffTactic/L05.lean"
+    },
+    {
+      "id": "intro_logic_IffTactic_L06",
+      "world": "IffTactic",
+      "level": 6,
+      "path": "IffTactic/L06.lean",
+      "sha256": "0a696b36931c8a6e0ddf453ea68ffb19fa2bc8a84dd983ce5dafebf05f6d19e8",
+      "upstream_sha256": "043abb2a7657ee454bc4c660e66b88dfa0aea48a1f9e720619715e1bc08ef221",
+      "upstream_path": "Game/Levels/IffTactic/L06.lean"
+    },
+    {
+      "id": "intro_logic_IffTactic_L07",
+      "world": "IffTactic",
+      "level": 7,
+      "path": "IffTactic/L07.lean",
+      "sha256": "0c919b7734de5e570967cfa081feda56970b1642218b5f62c836b7a6f3facc34",
+      "upstream_sha256": "b469d8a4f371bf6c62245450f0457f927fe8f7f476465608495063dca2f4ba28",
+      "upstream_path": "Game/Levels/IffTactic/L07.lean"
+    }
+  ]
+}

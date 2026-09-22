@@ -8,7 +8,7 @@ compiler diagnostics into a bounded repair loop. Lean is the final authority.
 This repository implements V1 compiler guidance, V2 retrieval, V3 informal reasoning,
 V4 discussion/context isolation, and V7 MiniF2F evaluation:
 **Qwen3 → Kimina/Lean → Lean-LSP-MCP proof state → Qwen repair → Kimina/Lean**.
-V1.1 adds a Lean-verified fallback portfolio, strategy-level duplicate rejection,
+V1.1 adds strategy-level duplicate rejection,
 immutable benchmark artifacts, and a repeated-run stability gate.
 V2 adds a fully local LeanExplore MCP client, bounded retrieved declarations in
 Qwen prompts, retrieval provenance/metrics, and a paired retrieval OFF/ON suite.
@@ -145,11 +145,20 @@ next fresh repair prompt. If LSP is configured as required and unavailable, the
 attempt stops with `LEAN_LSP_UNAVAILABLE` instead of silently claiming full V1
 behavior. Kimina remains the only component allowed to mark a proof verified.
 
-After a rejected Qwen candidate, V1.1 tries a configurable, one-time portfolio
-of general tactics (`rfl`, `simp`, `norm_num`, `omega`, `positivity`, and
-`aesop`). Each candidate is a complete task-preserving Lean file and is checked
-independently by Kimina. The fallback system cannot declare success itself and
-does not run before Qwen, so seeded repair cases still exercise the model loop.
+After a rejected Qwen candidate, the agent uses compiler diagnostics, retrieved
+declarations, and optional isolated reasoning to select its next proof attempt.
+There is no automatic tactic portfolio or prefix-salvage search. Only the model
+generates new proof candidates; Python preserves the task and Lean verifies it.
+See [agent-only repair and configuration migration](docs/agent-only-repair.md).
+Prompt evidence now uses whole-declaration packing, explicit rejected-proof/error
+pairs, and conservative relevance filtering. See [pre-V5 context hardening](docs/context-hardening.md)
+for its limits and offline validation; these changes do not yet establish an accuracy gain.
+
+An opt-in [V5 formal specialist](docs/v5.md) is available through `solve --v5 on`.
+It uses one DeepSeek-Prover-V2-7B-4bit candidate after a failed Qwen round, with
+sequential model unloading/loading and independent Lean verification. Download
+the specialist once with `bash scripts/setup-formal-specialist.sh`. It is disabled
+by default; real-model validation and accuracy comparison remain pending.
 
 Terminal output contains only `success`, canonical `end_reason`, and model `rounds`.
 Every complete attempt is written to `runs/results/<attempt-id>.json`, and the
@@ -235,8 +244,7 @@ scores 20/20.
 - Imports and all source preceding the target proof body are immutable, including
   the theorem declaration; hiding a changed theorem in a comment is rejected.
 - JSONL telemetry records attempts, iterations, proofs, failures, model calls,
-  token usage, context sizes, Kimina calls, fallback checks, load/unload timing,
-  and sampled RSS. Every fallback candidate and verifier result is retained.
+  token usage, context sizes, Kimina calls, load/unload timing, and sampled RSS.
 - Every LSP inspection stores its diagnostics, goal, source location, latency,
   availability, and exact tool-call count; `lean_lsp_calls` is no longer a
   placeholder counter.
@@ -266,14 +274,14 @@ local-lean-agent --config config/local.toml v2-ablation \
 ```
 
 Both conditions use identical Qwen settings, LSP feedback, and case-specific
-budgets. The V1.1 fallback portfolio is disabled in both to isolate retrieval.
+budgets. Neither condition has automatic tactic trials.
 The runner checkpoints the output file after each attempt, prints the summary
 at completion, and preserves a final immutable artifact under `runs/history/`.
 Use `--repetitions 3` for repeated paired runs. `experiment_complete` means the
 experiment ran without infrastructure errors, not that retrieval improved scores.
 
 The original `v1-suite` explicitly disables retrieval even when V2 is enabled
-in the config; its existing V1.1 fallback setting is preserved. It is a separate
+in the config. It is a separate
 acceptance suite, not the control condition of this V2 experiment.
 The runners validate the manifest's suite identifier and reject a V1/V2 mismatch
 before loading Qwen.
@@ -298,8 +306,7 @@ local-lean-agent --config config/local.toml v3-ablation \
   --output runs/v3-ablation-latest.json
 ```
 
-Both conditions keep V2 retrieval enabled and disable whole-proof fallback and
-compiler-prefix tactic probes. The V3 condition adds informal reasoning and its
+Both conditions keep V2 retrieval enabled. The V3 condition adds informal reasoning and its
 configured strategy-search/rewrite-prompt hooks; improvements cannot be attributed
 to the informal text alone. See [V3 design and experiment methodology](docs/v3.md)
 for isolation guarantees, metrics, interpretation, and historical audit methodology.
@@ -334,6 +341,23 @@ Development-only tests and research runners are described in
 
 ## V7 MiniF2F evaluation
 
+### Logic-game benchmark
+
+[A Lean Intro to Logic](docs/intro-logic.md) is also available as **88 pinned,
+statement-only tasks**, with separate results, per-world metrics and V4/V5
+conditions. Start with five problems:
+
+```bash
+bash scripts/start-logic-benchmark.sh --limit 5 --variant v4 \
+  --proof-format proof_body --live --output runs/logic-my-five.json
+```
+
+Use `--limit 0` for the complete corpus, or repeat `--variant v4 --variant v5`
+for a labelled specialist comparison. This measures unrestricted Mathlib theorem
+solving, **not** the game's restricted tactic inventories. [Guide and artifact locations](docs/intro-logic.md).
+
+### MiniF2F
+
 V7 can now evaluate the existing V1–V4 stack on a pinned MiniF2F Lean 4 dataset,
 without waiting for the V5 specialist or V6 multi-model routing. It supports
 deterministic subsets, paired conditions, checkpoints/resume, statement
@@ -354,17 +378,16 @@ main, reset and fresh formal requests. It logs truncation separately from Lean
 errors; legacy behavior remains the default. No accuracy gain is claimed before
 running the controlled comparison.
 
-The [proof-body and tactic-portfolio experiment](docs/proof-body-portfolio.md)
-adds immutable proof-slot assembly (`--proof-format proof_body`) and separately
-labelled `portfolio`, `v4`, and `v4_portfolio` MiniF2F conditions. Compiler trials,
-wall time, and audited portfolio successes are attributed separately from model
-calls. Whole-file generation remains available as the control.
+Immutable proof-slot assembly is available with `--proof-format proof_body`;
+whole-file generation remains available as the control. The old portfolio
+experiment is historical only; automatic tactic trials have been removed from
+all active solver and benchmark paths. See [agent-only repair](docs/agent-only-repair.md).
 
 ## Next milestones
 
 1. Address the measured V4 Lean-formalization and informal-output-budget failures,
    then repeat paired evaluation on development and held-out cases.
-2. Add the 4-bit DeepSeek-Prover specialist (V5).
+2. Validate and benchmark the opt-in 4-bit DeepSeek-Prover specialist (V5).
 3. Harden exclusive model routing and resource accounting (V6).
 4. Run larger, frozen MiniF2F ablations using the V7 evaluation runner.
 

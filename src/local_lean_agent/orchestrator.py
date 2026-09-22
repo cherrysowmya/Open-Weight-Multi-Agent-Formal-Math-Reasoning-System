@@ -10,7 +10,10 @@ from itertools import zip_longest
 from uuid import uuid4
 
 from .backends.base import ModelBackend
-from .config import AppConfig
+from .config import AppConfig, _validate
+from .model_router import ModelRouter
+from .specialist import specialist_request, extract_specialist_body
+from .context_evidence import EVIDENCE_VERSION, failure_memory, pack_declarations, relevant_hit
 from .contexts import (DISCUSSION_SYSTEM, FRESH_INSTRUCTION, PacketBudgetError,
     TaskPacket, conservative_tokens, parse_discussion, prepare_request, summarize_failures)
 from .feedback.base import LeanFeedbackProvider
@@ -19,14 +22,12 @@ from .output_budget import (RECOVERY_INSTRUCTION, choose_output_budget,
                             output_status, repetitive_output)
 from .prompts import SYSTEM_PROMPT, initial_prompt, repair_prompt, reset_repair_prompt, rewrite_repair_prompt
 from .proof_body import BODY_CONTRACT, ProofSlot, ProofSlotError, body_prompt, target_assignment
-from .portfolio import try_portfolio
 from .retrieval.base import SemanticRetriever
 from .telemetry import JSONLTelemetry
 from .types import (
     AttemptMetrics,
     AttemptResult,
     ChatMessage,
-    FallbackAttempt,
     FailureCategory,
     GenerationResult,
     InformalReasoningResult,
@@ -68,12 +69,13 @@ class ProofAgent:
         started = time.monotonic()
         metrics = AttemptMetrics()
         records: list[IterationRecord] = []
-        fallback_attempts: list[FallbackAttempt] = []
-        attempted_fallbacks: set[str] = set()
         retrieval_cache: dict[str, RetrievalResult] = {}
         informal_result: InformalReasoningResult | None = None
         strategy_retrieval: tuple[RetrievalResult, ...] = ()
         v4_requests: list[V4RequestRecord] = []
+        specialist_requests: list[V4RequestRecord] = []
+        router = None
+        specialist_active = False
         discussion = ""
         candidate = ""
         last_failure = FailureCategory.UNKNOWN
@@ -84,6 +86,13 @@ class ProofAgent:
         self.telemetry.emit("attempt_started", attempt_id, {"theorem": theorem})
 
         try:
+            if self.config.specialist.enabled:
+                _validate(self.config)
+                router = ModelRouter(self.backend, metrics, self.telemetry, attempt_id,
+                                     lambda: _memory_sample(self.backend, self.retriever))
+                # The specialist always returns a body assembled into the
+                # original task, even when the main agent uses whole files.
+                specialist_slot = ProofSlot.from_source(theorem)
             if self.config.generation.proof_format == "proof_body":
                 proof_slot = ProofSlot.from_source(theorem)
             should_generate = True
@@ -150,15 +159,16 @@ class ProofAgent:
                     should_generate = False
 
             if should_generate:
-                load_started = time.monotonic()
-                self.telemetry.emit("model_loading", attempt_id, {"model": self.config.mlx.model_id})
-                metrics.model_load_seconds = self.backend.load_model(
-                    self.config.mlx.model_id
-                )
+                if router:
+                    router.activate(self.config.mlx.model_id)
+                else:
+                    load_started = time.monotonic()
+                    self.telemetry.emit("model_loading", attempt_id, {"model": self.config.mlx.model_id})
+                    metrics.model_load_seconds = self.backend.load_model(self.config.mlx.model_id)
+                    self.telemetry.emit("model_loaded", attempt_id, {"model": self.config.mlx.model_id})
+                    if metrics.model_load_seconds == 0.0:
+                        metrics.model_load_seconds = time.monotonic() - load_started
                 model_loaded = True
-                self.telemetry.emit("model_loaded", attempt_id, {"model": self.config.mlx.model_id})
-                if metrics.model_load_seconds == 0.0:
-                    metrics.model_load_seconds = time.monotonic() - load_started
                 metrics.memory_samples_mb.append(
                     _memory_sample(self.backend, self.retriever)
                 )
@@ -168,6 +178,12 @@ class ProofAgent:
                 if should_generate
                 else ()
             ):
+                specialist_active = bool(router
+                    and metrics.formal_specialist_calls < self.config.specialist.max_calls
+                    and sum(r.iteration > 0 and not r.verification.valid for r in records)
+                        >= self.config.specialist.trigger_after_failures)
+                if router and not specialist_active:
+                    router.activate(self.config.mlx.model_id)
                 reset_context = False
                 retrieval = (
                     first_retrieval
@@ -188,205 +204,251 @@ class ProofAgent:
                 retrieved_declarations = render_retrieval(
                     retrieval, self.config.lean_explore.max_context_chars
                 )
-                if self._should_invoke_informal(records, informal_result):
-                    informal_result = self._run_informal_reasoning(
-                        theorem,
-                        records=records,
+                if specialist_active:
+                    if strategy_retrieval:
+                        retrieved_declarations = render_strategy_retrieval(
+                            retrieval, strategy_retrieval, self.config.lean_explore.max_context_chars)
+                    summary, source_iterations = summarize_failures(records, 2400)
+                    latest = records[-1]
+                    packet = TaskPacket(
+                        task=task_skeleton(theorem),
+                        goal_and_hypotheses=(latest.lean_feedback.goal_state or "")
+                            if latest.lean_feedback else "",
+                        diagnostics="\n".join(latest.verification.diagnostics),
                         retrieved_declarations=retrieved_declarations,
-                        attempt_id=attempt_id,
-                        metrics=metrics,
+                        informal_outline=render_informal_guidance(informal_result),
+                        failed_attempts=summary,
                     )
-                    strategy_retrieval = self._retrieve_for_strategy(
-                        informal_result, attempt_id=attempt_id, metrics=metrics,
-                        cache=retrieval_cache,
+                    try:
+                        request_record = specialist_request(
+                            packet, self.config.specialist, iteration, source_iterations)
+                    except PacketBudgetError as exc:
+                        raise ContextBudgetError(str(exc)) from exc
+                    specialist_requests.append(request_record)
+                    self.telemetry.emit("specialist_request_started", attempt_id, request_record)
+                    router.activate(self.config.specialist.model_id)
+                    metrics.formal_call_attempts += 1
+                    metrics.formal_specialist_calls += 1
+                    output_limit = self.config.specialist.max_output_tokens
+                    context_size = request_record.estimated_context_tokens
+                    fresh = False
+                    repair_action = "formal_specialist"
+                    budget_decision = choose_output_budget(self.config.generation, latest)
+                    metrics.formal_output_budget_requests.append({
+                        "iteration": iteration, "role": "formal_specialist",
+                        "requested_output_tokens": output_limit,
+                        "estimated_input_tokens": context_size,
+                        "context_limit": self.config.specialist.max_context_tokens,
+                        "action": "specialist_fixed",
+                    })
+                    generation = router.chat(
+                        request_record.messages, max_tokens=output_limit,
+                        temperature=self.config.specialist.temperature,
+                        top_p=self.config.specialist.top_p,
                     )
-                unavailable = next((r for r in strategy_retrieval
-                                    if self._retrieval_required_but_unavailable(r)), None)
-                if unavailable is not None:
-                    last_failure = FailureCategory.RETRIEVAL_UNAVAILABLE
-                    stop_reason = "retrieval_unavailable"
-                    error_message = unavailable.error_message
-                    break
-                if strategy_retrieval:
-                    retrieved_declarations = render_strategy_retrieval(
-                        retrieval, strategy_retrieval, self.config.lean_explore.max_context_chars
-                    )
-                informal_guidance = render_informal_guidance(
-                    informal_result,
-                    max_proof_chars=self.config.informal_reasoning.max_proof_chars,
-                    max_critique_chars=self.config.informal_reasoning.max_critique_chars,
-                )
-                v4 = self.config.v4
-                failures = sum(r.iteration > 0 and not r.verification.valid for r in records)
-                summary, source_iterations = summarize_failures(records, v4.summary_max_chars)
-                latest = records[-1] if records else None
-                packet = TaskPacket(
-                    task=task_skeleton(theorem),
-                    goal_and_hypotheses=(latest.lean_feedback.goal_state or "")
-                        if latest and latest.lean_feedback else "",
-                    diagnostics="\n".join(latest.verification.diagnostics) if latest else "",
-                    retrieved_declarations=retrieved_declarations,
-                    informal_outline=informal_guidance,
-                    failed_attempts=summary,
-                    discussion=discussion,
-                )
-                if (v4.enabled and v4.discussion_enabled
-                    and metrics.discussion_partner_calls < v4.max_discussion_calls
-                    and failures >= v4.trigger_after_failures * (metrics.discussion_partner_calls + 1)):
-                    advice = self._discuss(packet, iteration, source_iterations,
-                                           attempt_id, metrics, v4_requests)
-                    if advice:
-                        discussion = advice
-                        packet = replace(packet, discussion=advice)
-                if v4.enabled and discussion:
-                    informal_guidance += "\nDiscussion partner advice (unverified):\n" + discussion
-                previous = records[-1] if records else None
-                repetitive = bool(candidate and (is_degenerate_candidate(candidate)
-                    or candidate_repeats_rejected_attempt(records)))
-                if self.config.generation.output_budget_policy != "legacy":
-                    repetitive = repetitive or repetitive_output(candidate)
-                budget_decision = choose_output_budget(self.config.generation, previous,
-                                                       repetitive=repetitive)
-                reset_context = budget_decision.reset
-                if not candidate:
-                    repair_action = "initial"
-                    prompt = initial_prompt(
-                        theorem, retrieved_declarations, informal_guidance
-                    )
+                    metrics.specialist_prompt_tokens += generation.usage.prompt_tokens
+                    metrics.specialist_completion_tokens += generation.usage.completion_tokens
                 else:
-                    previous = records[-1]
-                    diagnostics = "\n".join(previous.verification.diagnostics)[
-                        : self.config.agent.diagnostics_max_chars
-                    ]
-                    lean_lsp_feedback = render_lean_feedback(previous.lean_feedback)
-                    rejected_history = render_rejected_history(records)
-                    prompt = (
-                        reset_repair_prompt(
+                    if self._should_invoke_informal(records, informal_result):
+                        informal_result = self._run_informal_reasoning(
                             theorem,
-                            diagnostics,
-                            iteration - 1,
-                            lean_lsp_feedback,
-                            rejected_history,
-                            retrieved_declarations,
-                            informal_guidance,
+                            records=records,
+                            retrieved_declarations=retrieved_declarations,
+                            attempt_id=attempt_id,
+                            metrics=metrics,
                         )
-                        if reset_context
-                        else repair_prompt(
-                            theorem,
-                            candidate,
-                            diagnostics,
-                            lean_lsp_feedback,
-                            rejected_history,
-                            retrieved_declarations,
-                            informal_guidance,
+                        strategy_retrieval = self._retrieve_for_strategy(
+                            informal_result, attempt_id=attempt_id, metrics=metrics,
+                            cache=retrieval_cache,
                         )
+                    unavailable = next((r for r in strategy_retrieval
+                                        if self._retrieval_required_but_unavailable(r)), None)
+                    if unavailable is not None:
+                        last_failure = FailureCategory.RETRIEVAL_UNAVAILABLE
+                        stop_reason = "retrieval_unavailable"
+                        error_message = unavailable.error_message
+                        break
+                    if strategy_retrieval:
+                        retrieved_declarations = render_strategy_retrieval(
+                            retrieval, strategy_retrieval, self.config.lean_explore.max_context_chars
+                        )
+                    informal_guidance = render_informal_guidance(
+                        informal_result,
+                        max_proof_chars=self.config.informal_reasoning.max_proof_chars,
+                        max_critique_chars=self.config.informal_reasoning.max_critique_chars,
                     )
-                    repair_action = "fresh_reset" if reset_context else "repair"
-                    if (self.config.informal_reasoning.enabled
-                        and self.config.informal_reasoning.rewrite_recovery_enabled
-                        and budget_decision.action not in {"expand_truncated", "retry_at_ceiling"}
-                        and has_rewrite_failure(previous.verification.diagnostics)):
-                        prompt = rewrite_repair_prompt(
-                            task_skeleton(theorem), diagnostics, lean_lsp_feedback,
-                            retrieved_declarations, informal_guidance,
+                    v4 = self.config.v4
+                    failures = sum(r.iteration > 0 and not r.verification.valid for r in records)
+                    summary, source_iterations = summarize_failures(records, v4.summary_max_chars)
+                    latest = records[-1] if records else None
+                    packet = TaskPacket(
+                        task=task_skeleton(theorem),
+                        goal_and_hypotheses=(latest.lean_feedback.goal_state or "")
+                            if latest and latest.lean_feedback else "",
+                        diagnostics="\n".join(latest.verification.diagnostics) if latest else "",
+                        retrieved_declarations=retrieved_declarations,
+                        informal_outline=informal_guidance,
+                        failed_attempts=summary,
+                        discussion=discussion,
+                    )
+                    if (v4.enabled and v4.discussion_enabled
+                        and metrics.discussion_partner_calls < v4.max_discussion_calls
+                        and failures >= v4.trigger_after_failures * (metrics.discussion_partner_calls + 1)):
+                        advice = self._discuss(packet, iteration, source_iterations,
+                                               attempt_id, metrics, v4_requests)
+                        if advice:
+                            discussion = advice
+                            packet = replace(packet, discussion=advice)
+                    if v4.enabled and discussion:
+                        informal_guidance += "\nDiscussion partner advice (unverified):\n" + discussion
+                    previous = records[-1] if records else None
+                    repetitive = bool(candidate and (is_degenerate_candidate(candidate)
+                        or candidate_repeats_rejected_attempt(records)))
+                    if self.config.generation.output_budget_policy != "legacy":
+                        repetitive = repetitive or repetitive_output(candidate)
+                    budget_decision = choose_output_budget(self.config.generation, previous,
+                                                           repetitive=repetitive)
+                    reset_context = budget_decision.reset
+                    if not candidate:
+                        repair_action = "initial"
+                        prompt = initial_prompt(
+                            theorem, retrieved_declarations, informal_guidance
                         )
-                        reset_context = True
-                        repair_action = "invalid_rewrite_reset"
-                        metrics.rewrite_recovery_prompts += 1
-                        self.telemetry.emit("formal_repair_strategy_changed", attempt_id, {
-                            "iteration": iteration, "action": repair_action,
-                            "reason": "Lean rejected a rewrite argument or could not find its pattern",
-                        })
-                output_recovery = budget_decision.action in {"expand_truncated", "retry_at_ceiling"}
-                if output_recovery:
-                    prompt += RECOVERY_INSTRUCTION
-                    repair_action = "output_budget_recovery"
-                formal_system = SYSTEM_PROMPT
-                if proof_slot is not None:
-                    formal_system = body_prompt(formal_system) + BODY_CONTRACT
-                    prompt = body_prompt(prompt)
-                messages = [
-                    ChatMessage("system", formal_system),
-                    ChatMessage("user", prompt),
-                ]
-                fresh = (v4.enabled and v4.fresh_context_enabled
-                    and metrics.fresh_subproblem_calls < v4.max_fresh_calls
-                    and failures >= v4.trigger_after_failures * (metrics.fresh_subproblem_calls + 1))
-                request_record = None
-                budget_decision = choose_output_budget(self.config.generation, previous,
-                    repetitive=repetitive, fresh=fresh, fresh_limit=v4.fresh_max_output_tokens)
-                output_limit = budget_decision.tokens
-                if reset_context and self.config.generation.output_budget_policy == "legacy":
-                    output_limit = min(self.config.generation.reset_output_tokens, output_limit)
-                if v4.enabled:
-                    context_size = conservative_tokens(tuple(messages))
-                    if fresh or (v4.compression_enabled and context_size + output_limit > self.config.generation.max_context_tokens):
-                        try:
-                            request_record = prepare_request(packet,
-                                system=formal_system + "\n"
-                                    + (body_prompt(FRESH_INSTRUCTION) if proof_slot else FRESH_INSTRUCTION)
-                                    + ((body_prompt(RECOVERY_INSTRUCTION) if proof_slot else RECOVERY_INSTRUCTION)
-                                       if output_recovery else ""),
-                                role="fresh_subproblem" if fresh else "main_compressed",
-                                iteration=iteration, context_limit=(v4.max_context_tokens if fresh
-                                    else self.config.generation.max_context_tokens),
-                                output_limit=output_limit, thinking=False,
-                                compress=v4.compression_enabled, sources=source_iterations)
-                        except PacketBudgetError as exc:
-                            raise ContextBudgetError(str(exc)) from exc
-                        messages = list(request_record.messages)
-                        context_size = request_record.estimated_context_tokens
-                        repair_action = "fresh_subproblem" if fresh else "context_compression"
-                        metrics.context_compressions += 1
                     else:
-                        request_record = V4RequestRecord("main", iteration, tuple(messages),
-                            context_size, output_limit, self.config.generation.enable_thinking)
-                    v4_requests.append(request_record)
-                    metrics.v4_context_sizes.append(context_size)
-                    self.telemetry.emit("v4_request_started", attempt_id, request_record)
-                else:
-                    context_size = (estimate_message_tokens(messages)
-                        if self.config.generation.output_budget_policy == "legacy"
-                        else conservative_tokens(tuple(messages)))
-                if context_size + output_limit > self.config.generation.max_context_tokens:
-                    raise ContextBudgetError(
-                        f"Estimated request ({context_size} input + "
-                        f"{output_limit} output tokens) exceeds "
-                        f"the {self.config.generation.max_context_tokens}-token limit"
+                        previous = records[-1]
+                        diagnostics = "\n".join(previous.verification.diagnostics)[
+                            : self.config.agent.diagnostics_max_chars
+                        ]
+                        lean_lsp_feedback = render_lean_feedback(previous.lean_feedback)
+                        rejected_history = render_rejected_history(records)
+                        prompt = (
+                            reset_repair_prompt(
+                                theorem,
+                                diagnostics,
+                                iteration - 1,
+                                lean_lsp_feedback,
+                                rejected_history,
+                                retrieved_declarations,
+                                informal_guidance,
+                            )
+                            if reset_context
+                            else repair_prompt(
+                                theorem,
+                                candidate,
+                                diagnostics,
+                                lean_lsp_feedback,
+                                rejected_history,
+                                retrieved_declarations,
+                                informal_guidance,
+                            )
+                        )
+                        repair_action = "fresh_reset" if reset_context else "repair"
+                        if (self.config.informal_reasoning.enabled
+                            and self.config.informal_reasoning.rewrite_recovery_enabled
+                            and budget_decision.action not in {"expand_truncated", "retry_at_ceiling"}
+                            and has_rewrite_failure(previous.verification.diagnostics)):
+                            prompt = rewrite_repair_prompt(
+                                task_skeleton(theorem), diagnostics, lean_lsp_feedback,
+                                retrieved_declarations, informal_guidance, rejected_history,
+                            )
+                            reset_context = True
+                            repair_action = "invalid_rewrite_reset"
+                            metrics.rewrite_recovery_prompts += 1
+                            self.telemetry.emit("formal_repair_strategy_changed", attempt_id, {
+                                "iteration": iteration, "action": repair_action,
+                                "reason": "Lean rejected a rewrite argument or could not find its pattern",
+                            })
+                    output_recovery = budget_decision.action in {"expand_truncated", "retry_at_ceiling"}
+                    if output_recovery:
+                        prompt += RECOVERY_INSTRUCTION
+                        repair_action = "output_budget_recovery"
+                    formal_system = SYSTEM_PROMPT
+                    if proof_slot is not None:
+                        formal_system = body_prompt(formal_system) + BODY_CONTRACT
+                        prompt = body_prompt(prompt)
+                    messages = [
+                        ChatMessage("system", formal_system),
+                        ChatMessage("user", prompt),
+                    ]
+                    fresh = (v4.enabled and v4.fresh_context_enabled
+                        and metrics.fresh_subproblem_calls < v4.max_fresh_calls
+                        and failures >= v4.trigger_after_failures * (metrics.fresh_subproblem_calls + 1))
+                    request_record = None
+                    budget_decision = choose_output_budget(self.config.generation, previous,
+                        repetitive=repetitive, fresh=fresh, fresh_limit=v4.fresh_max_output_tokens)
+                    output_limit = budget_decision.tokens
+                    if reset_context and self.config.generation.output_budget_policy == "legacy":
+                        output_limit = min(self.config.generation.reset_output_tokens, output_limit)
+                    if v4.enabled:
+                        context_size = conservative_tokens(tuple(messages))
+                        if fresh or (v4.compression_enabled and context_size + output_limit > self.config.generation.max_context_tokens):
+                            try:
+                                request_record = prepare_request(packet,
+                                    system=formal_system + "\n"
+                                        + (body_prompt(FRESH_INSTRUCTION) if proof_slot else FRESH_INSTRUCTION)
+                                        + ((body_prompt(RECOVERY_INSTRUCTION) if proof_slot else RECOVERY_INSTRUCTION)
+                                           if output_recovery else ""),
+                                    role="fresh_subproblem" if fresh else "main_compressed",
+                                    iteration=iteration, context_limit=(v4.max_context_tokens if fresh
+                                        else self.config.generation.max_context_tokens),
+                                    output_limit=output_limit, thinking=False,
+                                    compress=v4.compression_enabled, sources=source_iterations)
+                            except PacketBudgetError as exc:
+                                raise ContextBudgetError(str(exc)) from exc
+                            messages = list(request_record.messages)
+                            context_size = request_record.estimated_context_tokens
+                            repair_action = "fresh_subproblem" if fresh else "context_compression"
+                            metrics.context_compressions += 1
+                        else:
+                            request_record = V4RequestRecord("main", iteration, tuple(messages),
+                                context_size, output_limit, self.config.generation.enable_thinking)
+                        v4_requests.append(request_record)
+                        metrics.v4_context_sizes.append(context_size)
+                        self.telemetry.emit("v4_request_started", attempt_id, request_record)
+                    else:
+                        context_size = (estimate_message_tokens(messages)
+                            if self.config.generation.output_budget_policy == "legacy"
+                            else conservative_tokens(tuple(messages)))
+                    if context_size + output_limit > self.config.generation.max_context_tokens:
+                        raise ContextBudgetError(
+                            f"Estimated request ({context_size} input + "
+                            f"{output_limit} output tokens) exceeds "
+                            f"the {self.config.generation.max_context_tokens}-token limit"
+                        )
+                    budget_request = {
+                        "iteration": iteration, "policy": self.config.generation.output_budget_policy,
+                        "proof_format": self.config.generation.proof_format,
+                        "action": budget_decision.action, "previous_status": budget_decision.previous_status,
+                        "role": "fresh_subproblem" if fresh else "main",
+                        "requested_output_tokens": output_limit, "estimated_input_tokens": context_size,
+                        "context_limit": min(v4.max_context_tokens, self.config.generation.max_context_tokens)
+                            if fresh else self.config.generation.max_context_tokens,
+                    }
+                    metrics.formal_output_budget_requests.append(budget_request)
+                    metrics.formal_output_budget_increases += int(budget_decision.action == "expand_truncated")
+                    self.telemetry.emit("formal_output_budget_selected", attempt_id, budget_request)
+                    metrics.formal_call_attempts += 1
+                    if fresh:
+                        metrics.fresh_subproblem_calls += 1
+                    else:
+                        metrics.main_agent_calls += 1
+                    generation = (router.chat if router else self.backend.chat)(
+                        messages,
+                        max_tokens=output_limit,
+                        temperature=self.config.generation.temperature,
+                        top_p=self.config.generation.top_p,
+                        extra={
+                            "chat_template_kwargs": {
+                                "enable_thinking": (request_record.enable_thinking if request_record
+                                                    else self.config.generation.enable_thinking)
+                            }
+                        },
                     )
-                budget_request = {
-                    "iteration": iteration, "policy": self.config.generation.output_budget_policy,
-                    "proof_format": self.config.generation.proof_format,
-                    "action": budget_decision.action, "previous_status": budget_decision.previous_status,
-                    "role": "fresh_subproblem" if fresh else "main",
-                    "requested_output_tokens": output_limit, "estimated_input_tokens": context_size,
-                    "context_limit": min(v4.max_context_tokens, self.config.generation.max_context_tokens)
-                        if fresh else self.config.generation.max_context_tokens,
-                }
-                metrics.formal_output_budget_requests.append(budget_request)
-                metrics.formal_output_budget_increases += int(budget_decision.action == "expand_truncated")
-                self.telemetry.emit("formal_output_budget_selected", attempt_id, budget_request)
-                metrics.formal_call_attempts += 1
-                if fresh:
-                    metrics.fresh_subproblem_calls += 1
-                else:
-                    metrics.main_agent_calls += 1
-                generation = self.backend.chat(
-                    messages,
-                    max_tokens=output_limit,
-                    temperature=self.config.generation.temperature,
-                    top_p=self.config.generation.top_p,
-                    extra={
-                        "chat_template_kwargs": {
-                            "enable_thinking": (request_record.enable_thinking if request_record
-                                                else self.config.generation.enable_thinking)
-                        }
-                    },
-                )
                 if request_record is not None:
                     request_record.generation = generation
                     request_record.status = "candidate_generated"
-                    self.telemetry.emit("v4_request_completed", attempt_id, request_record)
+                    self.telemetry.emit("specialist_request_completed" if specialist_active
+                                        else "v4_request_completed", attempt_id, request_record)
                 metrics.model_calls += 1
                 metrics.prompt_tokens += generation.usage.prompt_tokens
                 metrics.completion_tokens += generation.usage.completion_tokens
@@ -396,9 +458,12 @@ class ProofAgent:
                 candidate = extract_lean_code(generation.text)
                 integrity_error = None
                 proof_body_normalization = None
-                if proof_slot is not None:
+                active_slot = specialist_slot if specialist_active else proof_slot
+                if active_slot is not None:
                     try:
-                        candidate, proof_body_normalization = proof_slot.assemble_response(candidate)
+                        if specialist_active:
+                            candidate = extract_specialist_body(generation.text)
+                        candidate, proof_body_normalization = active_slot.assemble_response(candidate)
                     except ValueError as exc:
                         proof_body_normalization = "rejected"
                         integrity_error = str(exc)
@@ -430,7 +495,9 @@ class ProofAgent:
                         failure_category=repeated_record.verification.failure_category,
                     )
                 else:
-                    self.telemetry.emit("lean_check_started", attempt_id, {"source": "model candidate", "iteration": iteration})
+                    self.telemetry.emit("lean_check_started", attempt_id, {
+                        "source": "formal specialist candidate" if specialist_active else "model candidate",
+                        "iteration": iteration})
                     verification = self.verifier.verify(
                         candidate, attempt_id=f"{attempt_id}-{iteration}"
                     )
@@ -461,8 +528,9 @@ class ProofAgent:
                     repair_action=repair_action,
                     requested_output_tokens=output_limit,
                     output_status=generation_status,
-                    output_budget_action=budget_decision.action,
+                    output_budget_action="specialist_fixed" if specialist_active else budget_decision.action,
                     proof_body_normalization=proof_body_normalization,
+                    role="formal_specialist" if specialist_active else ("fresh_subproblem" if fresh else "main"),
                 )
                 records.append(record)
                 metrics.memory_samples_mb.append(
@@ -470,6 +538,7 @@ class ProofAgent:
                 )
                 self.telemetry.emit("iteration_completed", attempt_id, record)
                 if verification.valid:
+                    metrics.specialist_successes += int(specialist_active)
                     last_failure = FailureCategory.NONE
                     stop_reason = "verified"
                     break
@@ -486,79 +555,6 @@ class ProofAgent:
                     stop_reason = "lean_lsp_unavailable"
                     error_message = lean_feedback.error_message
                     break
-                salvage = self._try_rewrite_prefix_salvage(
-                    theorem,
-                    candidate,
-                    verification,
-                    attempt_id=attempt_id,
-                    iteration=iteration,
-                    metrics=metrics,
-                    attempts=fallback_attempts,
-                    attempted=attempted_fallbacks,
-                )
-                if salvage is not None:
-                    candidate, verification = salvage
-                    last_failure = verification.failure_category
-                    if verification.valid:
-                        last_failure = FailureCategory.NONE
-                        stop_reason = "verified"
-                        records.append(
-                            IterationRecord(
-                                iteration=iteration,
-                                candidate=candidate,
-                                verification=verification,
-                                generation=GenerationResult(
-                                    text=candidate,
-                                    model="compiler_prefix_salvage",
-                                    finish_reason="verified_rewrite_salvage",
-                                ),
-                                estimated_context_tokens=0,
-                                repair_action="rewrite_prefix_salvage",
-                            )
-                        )
-                        break
-                    stop_reason = "verifier_unavailable"
-                    error_message = (
-                        verification.diagnostics[0]
-                        if verification.diagnostics
-                        else "Lean verifier became unavailable during prefix salvage"
-                    )
-                    break
-                fallback = self._try_fallback_portfolio(
-                    theorem,
-                    attempt_id=attempt_id,
-                    iteration=iteration,
-                    metrics=metrics,
-                    attempts=fallback_attempts,
-                    attempted=attempted_fallbacks,
-                )
-                if fallback is not None:
-                    candidate, verification = fallback
-                    last_failure = verification.failure_category
-                    if verification.valid:
-                        last_failure = FailureCategory.NONE
-                        stop_reason = "verified"
-                        records.append(
-                            IterationRecord(
-                                iteration=iteration,
-                                candidate=candidate,
-                                verification=verification,
-                                generation=GenerationResult(
-                                    text=candidate,
-                                    model="v1_1_fallback",
-                                    finish_reason="verified_fallback",
-                                ),
-                                estimated_context_tokens=0,
-                            )
-                        )
-                        break
-                    stop_reason = "verifier_unavailable"
-                    error_message = (
-                        verification.diagnostics[0]
-                        if verification.diagnostics
-                        else "Lean verifier became unavailable during fallback checking"
-                    )
-                    break
         except ProofSlotError as exc:
             last_failure = FailureCategory.TASK_MUTATION
             stop_reason = "unsupported_proof_slot"
@@ -571,9 +567,8 @@ class ProofAgent:
             self.telemetry.emit("attempt_error", attempt_id, {"error": str(exc)})
         except Exception as exc:
             last_failure = (
-                FailureCategory.MODEL_UNAVAILABLE
-                if not records
-                else FailureCategory.UNKNOWN
+                FailureCategory.SPECIALIST_UNAVAILABLE if specialist_active else
+                (FailureCategory.MODEL_UNAVAILABLE if not records else FailureCategory.UNKNOWN)
             )
             stop_reason = "runtime_error"
             error_message = f"{type(exc).__name__}: {exc}"
@@ -583,12 +578,21 @@ class ProofAgent:
                 {"error": error_message},
             )
         finally:
-            for request in v4_requests:
+            for request in [*v4_requests, *specialist_requests]:
                 if request.status == "pending":
                     request.status = "error"
                     request.error_message = error_message or "Request did not complete"
-                    self.telemetry.emit("v4_request_failed", attempt_id, request)
-            if self.config.agent.unload_model_after_attempt and model_loaded:
+                    self.telemetry.emit("specialist_request_failed" if request.role == "formal_specialist"
+                                        else "v4_request_failed", attempt_id, request)
+            if router:
+                # V5 always releases its owned model at attempt completion,
+                # including failure or interruption. Never reload Qwen on success.
+                try:
+                    router.unload()
+                except Exception as exc:
+                    error_message = f"Model cleanup failed: {exc}"
+                    self.telemetry.emit("attempt_error", attempt_id, {"error": error_message})
+            elif self.config.agent.unload_model_after_attempt and model_loaded:
                 self.telemetry.emit("model_unloading", attempt_id, {})
                 metrics.model_unload_seconds = self.backend.unload_model()
                 self.telemetry.emit("model_unloaded", attempt_id, {})
@@ -605,9 +609,9 @@ class ProofAgent:
             error_message=error_message,
             iterations=records,
             metrics=metrics,
-            fallback_attempts=fallback_attempts,
             informal_reasoning=informal_result,
             v4_requests=v4_requests,
+            specialist_requests=specialist_requests,
         )
         self.telemetry.emit("attempt_completed", attempt_id, result)
         return result
@@ -775,70 +779,6 @@ class ProofAgent:
             and not feedback.available
         )
 
-    def _try_fallback_portfolio(
-        self,
-        theorem: str,
-        *,
-        attempt_id: str,
-        iteration: int,
-        metrics: AttemptMetrics,
-        attempts: list[FallbackAttempt],
-        attempted: set[str],
-    ) -> tuple[str, VerificationResult] | None:
-        if not self.config.agent.fallback_enabled:
-            return None
-        return try_portfolio(theorem, verifier=self.verifier, config=self.config,
-                             attempt_id=f"{attempt_id}-{iteration}", metrics=metrics,
-                             attempts=attempts, attempted=attempted, telemetry=self.telemetry)
-
-    def _try_rewrite_prefix_salvage(
-        self,
-        theorem: str,
-        candidate: str,
-        verification: VerificationResult,
-        *,
-        attempt_id: str,
-        iteration: int,
-        metrics: AttemptMetrics,
-        attempts: list[FallbackAttempt],
-        attempted: set[str],
-    ) -> tuple[str, VerificationResult] | None:
-        config = self.config.informal_reasoning
-        if (not config.enabled or not config.rewrite_recovery_enabled
-            or not config.rewrite_salvage_enabled
-            or not has_rewrite_failure(verification.diagnostics)):
-            return None
-        for tactic in config.rewrite_salvage_tactics:
-            variants = rewrite_prefix_candidates(candidate, verification.diagnostics, tactic)
-            if not variants:
-                return None
-            for label, salvaged in variants:
-                if metrics.rewrite_salvage_checks >= config.rewrite_salvage_max_checks:
-                    return None
-                if validate_task_preserved(theorem, salvaged) is not None:
-                    continue
-                fingerprint = strategy_fingerprint(salvaged)
-                if fingerprint in attempted:
-                    continue
-                attempted.add(fingerprint)
-                self.telemetry.emit("salvage_check_started", attempt_id, {"tactic": tactic})
-                checked = self.verifier.verify(
-                    salvaged,
-                    attempt_id=f"{attempt_id}-{iteration}-rewrite-salvage-{len(attempts) + 1}",
-                )
-                metrics.kimina_checks += 1
-                metrics.fallback_checks += 1
-                metrics.rewrite_salvage_checks += 1
-                fallback = FallbackAttempt(f"rewrite_prefix:{label}:{tactic}", salvaged, checked)
-                attempts.append(fallback)
-                self.telemetry.emit("rewrite_prefix_salvage_checked", attempt_id, fallback)
-                if checked.valid:
-                    metrics.rewrite_salvage_successes += 1
-                    return salvaged, checked
-                if checked.failure_category == FailureCategory.VERIFIER_UNAVAILABLE:
-                    return salvaged, checked
-        return None
-
     def _retrieve_for_prompt(
         self,
         theorem: str,
@@ -899,6 +839,13 @@ class ProofAgent:
         metrics.retrieval_calls += result.tool_calls
         metrics.retrieval_latency_seconds += result.elapsed_seconds
         self.telemetry.emit("semantic_retrieval_completed", attempt_id, result)
+        if result.available:
+            self.telemetry.emit("retrieval_evidence_filtered", attempt_id, {
+                "policy": EVIDENCE_VERSION, "query": result.query,
+                "kept_names": [hit.name for hit in result.hits if relevant_hit(hit, result.query)],
+                "omitted_names": [hit.name for hit in result.hits if not relevant_hit(hit, result.query)],
+                "reason": "Conservative topic overlap; selection is not proof of applicability.",
+            })
         if strategy:
             self.telemetry.emit("strategy_retrieval_completed", attempt_id, result)
         return result
@@ -1015,24 +962,13 @@ def render_retrieval(
         )
     if not retrieval.hits:
         return "LeanExplore returned no matching declarations."
-    header = "LeanExplore local results"
-    if retrieval.data_version:
-        header += f" (data version {retrieval.data_version})"
-    parts = [header + ":"]
-    for index, hit in enumerate(retrieval.hits, start=1):
-        item = f"{index}. declaration_id={hit.declaration_id}; exact_name={hit.name}"
-        if hit.description:
-            item += "\nDescription: " + hit.description.strip()
-        if hit.source_text:
-            item += "\nLean source:\n" + hit.source_text.strip()
-        proposed = "\n\n".join([*parts, item])
-        if len(proposed) > max_chars:
-            remaining = max_chars - len("\n\n".join(parts)) - 2
-            if remaining > 80:
-                parts.append(item[:remaining].rstrip() + "\n[truncated]")
-            break
-        parts.append(item)
-    return "\n\n".join(parts)[:max_chars]
+    entries = [
+        {"declaration_id": hit.declaration_id, "exact_name": hit.name,
+         "description": hit.description, "lean_source": hit.source_text,
+         "data_version": retrieval.data_version}
+        for hit in retrieval.hits if relevant_hit(hit, retrieval.query)
+    ]
+    return pack_declarations(entries, max_chars)
 
 
 def render_strategy_retrieval(
@@ -1042,13 +978,15 @@ def render_strategy_retrieval(
     hits = []
     seen = set()
     available = [result for result in strategies if result.available]
-    for row in zip_longest(*(result.hits for result in available)):
+    for row in zip_longest(*(tuple(hit for hit in result.hits
+                                  if relevant_hit(hit, result.query))
+                             for result in available)):
         for hit in row:
             if hit is not None and hit.name not in seen:
                 hits.append(hit)
                 seen.add(hit.name)
     for hit in (task.hits if task and task.available else ()):
-        if hit.name not in seen:
+        if hit.name not in seen and relevant_hit(hit, task.query):
             hits.append(hit)
             seen.add(hit.name)
     if not hits:
@@ -1066,92 +1004,11 @@ def has_rewrite_failure(diagnostics: tuple[str, ...]) -> bool:
                               "tactic 'rewrite' failed"))
 
 
-def rewrite_prefix_candidate(
-    candidate: str, diagnostics: tuple[str, ...], tactic: str,
-) -> str | None:
-    """Return the first safe rewrite-prefix variant, retained for public use."""
-    variants = rewrite_prefix_candidates(candidate, diagnostics, tactic)
-    return variants[0][1] if variants else None
-
-
-def rewrite_prefix_candidates(
-    candidate: str, diagnostics: tuple[str, ...], tactic: str,
-) -> tuple[tuple[str, str], ...]:
-    """Build bounded, Lean-checked repairs cut no later than the first error."""
-    rewrite_line = None
-    error_lines: list[int] = []
-    for diagnostic in diagnostics:
-        match = re.search(r"(?m)(?:^|\n)(\d+):(\d+):\s*error:", diagnostic)
-        if match:
-            error_lines.append(int(match.group(1)))
-            if rewrite_line is None and has_rewrite_failure((diagnostic,)):
-                rewrite_line = int(match.group(1))
-    lines = candidate.rstrip().splitlines()
-    if (rewrite_line is None or not 1 <= rewrite_line <= len(lines)
-        or any(not 1 <= line <= len(lines) for line in error_lines)):
-        return ()
-    rewrite = lines[rewrite_line - 1]
-    if not re.search(r"\b(?:rw|rewrite)\b", rewrite):
-        return ()
-    cut_line = min([line for line in error_lines if line <= rewrite_line], default=rewrite_line)
-    prefix = lines[: cut_line - 1]
-    if not prefix or _target_assignment_index("\n".join(prefix)) is None:
-        return ()
-    failing = lines[cut_line - 1]
-    indent = re.match(r"\s*", failing).group(0)
-    variants: list[tuple[str, str]] = []
-    # When an earlier inline proof term already failed, retaining it would not
-    # be a successful prefix. Preserve only its declared local proposition and
-    # ask Lean's positivity tactic to prove it; Kimina still checks the result.
-    if cut_line < rewrite_line and re.match(r"\s*have\b", failing) and ":=" in failing:
-        declaration = failing.split(":=", 1)[0].rstrip() + " := by positivity"
-        variants.append(("repair_have_positivity", "\n".join(
-            [*prefix, declaration, indent + tactic]
-        ) + "\n"))
-    variants.append(("clean_prefix", "\n".join([*prefix, indent + tactic]) + "\n"))
-    unique: dict[str, tuple[str, str]] = {}
-    for label, source in variants:
-        unique.setdefault(strategy_fingerprint(source), (label, source))
-    return tuple(unique.values())
-
-
 def render_rejected_history(
     records: list[IterationRecord], *, max_attempts: int = 4, max_chars: int = 4000
 ) -> str:
     """Render a bounded failure memory for otherwise fresh repair contexts."""
-    rejected = [record for record in records if not record.verification.valid]
-    parts: list[str] = []
-    for record in rejected[-max_attempts:]:
-        diagnostic = (
-            record.verification.diagnostics[0]
-            if record.verification.diagnostics
-            else "Lean rejected this candidate"
-        )
-        parts.append(
-            f"Attempt {record.iteration} rejected approach:\n"
-            f"{_rejected_approach_excerpt(record.candidate)}\n"
-            f"Diagnostic:\n{diagnostic[:600]}"
-        )
-    return "\n\n".join(parts)[-max_chars:]
-
-
-def _rejected_approach_excerpt(candidate: str) -> str:
-    lines: list[str] = []
-    for raw_line in candidate.splitlines():
-        line = raw_line.strip()
-        if not line or line.startswith(("import ", "open ")):
-            continue
-        if line.startswith(("theorem ", "lemma ", "example ")):
-            if ":=" not in line:
-                continue
-            line = line.split(":=", 1)[1].strip()
-            if not line:
-                continue
-        if line not in lines:
-            lines.append(line[:240])
-        if len(lines) == 8:
-            break
-    return "\n".join(f"- {line}" for line in lines) or "- empty candidate"
+    return failure_memory(records, max_chars, max_attempts)[0]
 
 
 def validate_task_preserved(task: str, candidate: str) -> str | None:

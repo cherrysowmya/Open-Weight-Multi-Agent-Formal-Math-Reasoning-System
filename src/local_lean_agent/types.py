@@ -19,6 +19,7 @@ class FailureCategory(StrEnum):
     LEAN_LSP_UNAVAILABLE = "lean_lsp_unavailable"
     RETRIEVAL_UNAVAILABLE = "retrieval_unavailable"
     MODEL_UNAVAILABLE = "model_unavailable"
+    SPECIALIST_UNAVAILABLE = "specialist_unavailable"
     CONTEXT_BUDGET = "context_budget"
     ITERATION_BUDGET = "iteration_budget"
     UNKNOWN = "unknown"
@@ -176,15 +177,14 @@ class AttemptMetrics:
     retrieval_latency_seconds: float = 0.0
     strategy_retrieval_queries: int = 0
     rewrite_recovery_prompts: int = 0
-    rewrite_salvage_checks: int = 0
-    rewrite_salvage_successes: int = 0
     lean_lsp_calls: int = 0
     kimina_checks: int = 0
-    fallback_checks: int = 0
-    portfolio_checks: int = 0
-    portfolio_wall_clock_seconds: float = 0.0
-    portfolio_successes: int = 0
     formal_specialist_calls: int = 0
+    specialist_prompt_tokens: int = 0
+    specialist_completion_tokens: int = 0
+    specialist_successes: int = 0
+    model_transitions: list[dict[str, Any]] = field(default_factory=list)
+    model_peak_sampled_rss_mb: dict[str, float] = field(default_factory=dict)
     informal_generator_calls: int = 0
     informal_verifier_calls: int = 0
     informal_prompt_tokens: int = 0
@@ -218,14 +218,7 @@ class IterationRecord:
     output_status: str = "not_recorded"
     output_budget_action: str | None = None
     proof_body_normalization: str | None = None
-
-
-@dataclass(frozen=True, slots=True)
-class FallbackAttempt:
-    tactic: str
-    candidate: str
-    verification: VerificationResult
-    wall_clock_seconds: float = 0.0
+    role: str = "main"
 
 
 @dataclass(slots=True)
@@ -239,9 +232,9 @@ class AttemptResult:
     error_message: str | None
     iterations: list[IterationRecord]
     metrics: AttemptMetrics
-    fallback_attempts: list[FallbackAttempt] = field(default_factory=list)
     informal_reasoning: InformalReasoningResult | None = None
     v4_requests: list[V4RequestRecord] = field(default_factory=list)
+    specialist_requests: list[V4RequestRecord] = field(default_factory=list)
 
     @property
     def end_reason(self) -> str:

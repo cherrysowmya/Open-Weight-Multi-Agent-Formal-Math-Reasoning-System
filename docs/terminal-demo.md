@@ -52,8 +52,8 @@ feedback goes back to the model. Only a compiler-accepted proof is successful.â€
 
 This focused demonstration shows the input check, LSP diagnostics, retrieval,
 Qwen formal repair, and final Lean verification. A possible repaired body is
-`by positivity`, but the model is not forced to output it. If a fallback tactic
-solves the theorem, the display labels it as automation, not a Qwen success.
+`by positivity`, but the model is not forced to output it. The agent must choose
+its proof; there is no automatic tactic portfolio or prefix-salvage search.
 Your input file is unchanged. On success, a separate verified proof is saved.
 
 ## 3. Optional multi-role demonstration
@@ -101,8 +101,7 @@ Use `--informal-policy after_model_failures` for the ordinary adaptive policy.
 
 The expected result is failure, never a successful `sorry`. Exhausting the budget
 does not prove falsity; this particular statement is known to be false in advance.
-Tactic-portfolio checks have separate costs and can add time beyond the model-round
-budget. Do not use a hard negative as the opening time-critical demonstration.
+Do not use a hard negative as the opening time-critical demonstration.
 
 ## 5. What appears in the terminal
 
@@ -123,7 +122,7 @@ The following is an illustrative sequence, not a promised model result:
 
 The final JSON includes success/failure, stop reason, formal rounds, wall time,
 role call counts, total input/output tokens, retrieval/LSP/Kimina counts,
-portfolio attribution, load/unload time, and absolute artifact paths.
+load/unload time, and absolute artifact paths.
 Fresh formal contexts are a subset of formal calls, not extra model calls to add
 again. Token counts use the usage reported by the backend. Detailed memory samples,
 candidate code, diagnoses, model output and per-round metrics remain in the full
@@ -163,6 +162,11 @@ redirect stdout to a JSON file without losing the live terminal display.
 Without `--live`, the existing compact terminal output stays unchanged.
 
 ## Rehearsal record (2026-09-20)
+
+**Historical record:** these rehearsals preceded removal of automatic tactic
+trials. The optional multi-role success below depended on the removed portfolio
+and is not a result for the current agent-only version. See
+[agent-only repair](agent-only-repair.md). New runs may have different outcomes.
 
 The repair command above was exercised with the real local stack. Lean rejected
 the seeded `linarith`, Qwen returned `by positivity`, and Kimina accepted the

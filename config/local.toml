@@ -76,9 +76,6 @@ strategy_retrieval_enabled = true
 strategy_query_limit = 2
 strategy_query_max_chars = 240
 rewrite_recovery_enabled = true
-rewrite_salvage_tactics = ["nlinarith", "linarith", "omega", "simp_all"]
-rewrite_salvage_enabled = true
-rewrite_salvage_max_checks = 8
 
 [v4]
 enabled = true
@@ -97,7 +94,15 @@ summary_max_chars = 2400
 max_rounds = 5
 unload_model_after_attempt = true
 diagnostics_max_chars = 8000
-fallback_enabled = true
-fallback_tactics = ["rfl", "simp", "norm_num", "omega", "positivity", "aesop"]
 log_path = "../runs/attempts.jsonl"
 result_dir = "../runs/results"
+[specialist]
+# Opt in with `solve ... --v5 on`. Uses a round from --max-rounds, not extra attempts.
+enabled = false
+model_id = "mlx-community/DeepSeek-Prover-V2-7B-4bit"
+trigger_after_failures = 1
+max_calls = 1
+max_context_tokens = 8192
+max_output_tokens = 2048
+temperature = 0.0
+top_p = 0.95

@@ -1,5 +1,9 @@
 # V2 paired benchmark — 2026-09-02
 
+> Historical methodology notice: automatic tactic portfolios and prefix-salvage
+> trials have been removed. Related commands, settings and assisted scores below
+> describe older versions, not the current solver. See [agent-only repair](agent-only-repair.md).
+
 ## Result
 
 In this one 20-case paired run, local LeanExplore improved positive-task success

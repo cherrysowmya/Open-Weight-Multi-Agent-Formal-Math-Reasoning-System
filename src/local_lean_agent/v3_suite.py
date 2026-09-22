@@ -165,8 +165,6 @@ def attempt_measurements(case: V3Case, result: AttemptResult) -> dict[str, Any]:
         "retrieval_calls": result.metrics.retrieval_calls,
         "strategy_retrieval_queries": result.metrics.strategy_retrieval_queries,
         "rewrite_recovery_prompts": result.metrics.rewrite_recovery_prompts,
-        "rewrite_salvage_checks": result.metrics.rewrite_salvage_checks,
-        "rewrite_salvage_successes": result.metrics.rewrite_salvage_successes,
         "invalid_rewrite_failures": sum(any("invalid rewrite argument" in d.lower()
                                             for d in record.verification.diagnostics)
                                         for record in rejected),
@@ -213,10 +211,6 @@ def summarize_condition(case_runs: list[dict[str, Any]]) -> dict[str, Any]:
                                           for item in case_runs),
         "rewrite_recovery_prompts": sum(item["measurements"].get("rewrite_recovery_prompts", 0)
                                         for item in case_runs),
-        "rewrite_salvage_checks": sum(item["measurements"].get("rewrite_salvage_checks", 0)
-                                      for item in case_runs),
-        "rewrite_salvage_successes": sum(item["measurements"].get("rewrite_salvage_successes", 0)
-                                         for item in case_runs),
         "invalid_rewrite_failures": sum(item["measurements"].get("invalid_rewrite_failures", 0)
                                         for item in case_runs),
         "first_pass_successes": sum(item["measurements"]["first_pass_success"] for item in positives),

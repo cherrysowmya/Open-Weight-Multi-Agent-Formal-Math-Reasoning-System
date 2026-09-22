@@ -92,14 +92,6 @@ class InformalReasoningConfig:
     strategy_query_limit: int = 2
     strategy_query_max_chars: int = 240
     rewrite_recovery_enabled: bool = True
-    rewrite_salvage_enabled: bool = True
-    rewrite_salvage_max_checks: int = 8
-    rewrite_salvage_tactics: tuple[str, ...] = (
-        "nlinarith",
-        "linarith",
-        "omega",
-        "simp_all",
-    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -118,19 +110,22 @@ class V4Config:
 
 
 @dataclass(frozen=True, slots=True)
+class SpecialistConfig:
+    enabled: bool = False
+    model_id: str = "mlx-community/DeepSeek-Prover-V2-7B-4bit"
+    trigger_after_failures: int = 1
+    max_calls: int = 1
+    max_context_tokens: int = 8192
+    max_output_tokens: int = 2048
+    temperature: float = 0.0
+    top_p: float = 0.95
+
+
+@dataclass(frozen=True, slots=True)
 class AgentConfig:
     max_iterations: int = 5
     unload_model_after_attempt: bool = True
     diagnostics_max_chars: int = 8_000
-    fallback_enabled: bool = True
-    fallback_tactics: tuple[str, ...] = (
-        "rfl",
-        "simp",
-        "norm_num",
-        "omega",
-        "positivity",
-        "aesop",
-    )
     log_path: Path = Path("runs/attempts.jsonl")
     result_dir: Path = Path("runs/results")
 
@@ -147,6 +142,7 @@ class AppConfig:
     )
     agent: AgentConfig = field(default_factory=AgentConfig)
     v4: V4Config = field(default_factory=V4Config)
+    specialist: SpecialistConfig = field(default_factory=SpecialistConfig)
 
 
 def _section(data: dict[str, Any], name: str) -> dict[str, Any]:
@@ -201,16 +197,12 @@ def load_config(path: str | Path | None = None) -> AppConfig:
                 value = (config_path.parent / value).resolve()
             lean_explore_data[key] = value
     informal_reasoning_data = _section(data, "informal_reasoning")
-    if "rewrite_salvage_tactics" in informal_reasoning_data:
-        informal_reasoning_data["rewrite_salvage_tactics"] = tuple(
-            str(value).strip()
-            for value in informal_reasoning_data["rewrite_salvage_tactics"]
-        )
     agent_data = _section(data, "agent")
-    if "fallback_tactics" in agent_data:
-        agent_data["fallback_tactics"] = tuple(
-            str(value).strip() for value in agent_data["fallback_tactics"]
-        )
+    retired = (set(agent_data) & {"fallback_enabled", "fallback_tactics"}) | (
+        set(informal_reasoning_data) & {"rewrite_salvage_enabled", "rewrite_salvage_tactics", "rewrite_salvage_max_checks"})
+    if retired:
+        raise ValueError("Automatic tactic trials have been removed. Remove these retired settings: "
+                         + ", ".join(sorted(retired)))
     if "max_rounds" in agent_data:
         if "max_iterations" in agent_data:
             raise ValueError("[agent] cannot set both max_rounds and max_iterations")
@@ -231,12 +223,35 @@ def load_config(path: str | Path | None = None) -> AppConfig:
         informal_reasoning=InformalReasoningConfig(**informal_reasoning_data),
         agent=AgentConfig(**agent_data),
         v4=V4Config(**_section(data, "v4")),
+        specialist=SpecialistConfig(**_section(data, "specialist")),
     )
     _validate(config)
     return config
 
 
 def _validate(config: AppConfig) -> None:
+    specialist = config.specialist
+    if type(specialist.enabled) is not bool:
+        raise ValueError("specialist.enabled must be a boolean")
+    if (type(specialist.trigger_after_failures) is not int
+            or not 1 <= specialist.trigger_after_failures <= 20):
+        raise ValueError("specialist trigger_after_failures must be between 1 and 20")
+    if type(specialist.max_calls) is not int or specialist.max_calls != 1:
+        raise ValueError("Minimal V5 supports exactly one specialist invocation per theorem")
+    if (type(specialist.max_context_tokens) is not int
+            or not 1024 <= specialist.max_context_tokens <= 8192):
+        raise ValueError("Specialist context must be between 1024 and 8192 tokens")
+    if (type(specialist.max_output_tokens) is not int
+            or not 0 < specialist.max_output_tokens < specialist.max_context_tokens):
+        raise ValueError("Specialist output must leave room for its input packet")
+    if not 0 <= specialist.temperature <= 2 or not 0 < specialist.top_p <= 1:
+        raise ValueError("Invalid specialist sampling parameters")
+    if not isinstance(specialist.model_id, str) or not specialist.model_id.strip():
+        raise ValueError("Specialist model_id must be nonempty")
+    if specialist.enabled and not config.mlx.managed_server:
+        raise ValueError("V5 requires managed MLX serving to guarantee model unloading")
+    if specialist.enabled and specialist.model_id == config.mlx.model_id:
+        raise ValueError("Specialist and orchestrator must use different model IDs")
     generation = config.generation
     if generation.proof_format not in {"full_file", "proof_body"}:
         raise ValueError("proof_format must be full_file or proof_body")
@@ -276,11 +291,6 @@ def _validate(config: AppConfig) -> None:
         raise ValueError("max_output_tokens must be smaller than max_context_tokens")
     if config.agent.max_iterations <= 0:
         raise ValueError("max_iterations must be positive")
-    if config.agent.fallback_enabled and not config.agent.fallback_tactics:
-        raise ValueError("fallback_tactics cannot be empty when fallbacks are enabled")
-    for tactic in config.agent.fallback_tactics:
-        if not tactic or "\n" in tactic or "\r" in tactic or len(tactic) > 120:
-            raise ValueError("fallback tactics must be nonempty single-line Lean tactics")
     if config.lean_lsp.request_timeout_seconds <= 0:
         raise ValueError("Lean-LSP-MCP request timeout must be positive")
     if config.lean_lsp.max_feedback_chars <= 0:
@@ -323,15 +333,6 @@ def _validate(config: AppConfig) -> None:
         raise ValueError("strategy_query_limit must be between 1 and 3")
     if not 1 <= informal.strategy_query_max_chars <= 500:
         raise ValueError("strategy_query_max_chars must be between 1 and 500")
-    if not 1 <= informal.rewrite_salvage_max_checks <= 16:
-        raise ValueError("rewrite_salvage_max_checks must be between 1 and 16 per theorem")
-    if len(informal.rewrite_salvage_tactics) > 4:
-        raise ValueError("rewrite_salvage_tactics may contain at most four tactics")
-    if informal.rewrite_salvage_enabled and not informal.rewrite_salvage_tactics:
-        raise ValueError("rewrite_salvage_tactics cannot be empty when salvage is enabled")
-    for tactic in informal.rewrite_salvage_tactics:
-        if not tactic or "\n" in tactic or "\r" in tactic or len(tactic) > 120:
-            raise ValueError("rewrite salvage tactics must be nonempty single-line Lean tactics")
     if not 0 <= informal.generator_temperature <= 2:
         raise ValueError("informal generator_temperature must be between 0 and 2")
     if not 0 <= informal.verifier_temperature <= 2:
