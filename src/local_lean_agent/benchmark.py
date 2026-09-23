@@ -46,7 +46,7 @@ def environment_metadata(config: AppConfig) -> dict:
     result = subprocess.run(["git", "-C", str(project), "rev-parse", "HEAD"],
                             capture_output=True, text=True)
     packages = {}
-    for package in ("mlx", "mlx-lm", "transformers", "huggingface-hub"):
+    for package in ("mlx", "mlx-lm", "transformers", "tokenizers", "huggingface-hub"):
         try:
             packages[package] = version(package)
         except PackageNotFoundError:

@@ -13,7 +13,9 @@ authors = [{ name = "Local Lean Agent contributors" }]
 dependencies = []
 
 [project.optional-dependencies]
-mlx = ["mlx-lm==0.31.3"]
+# Transformers 5.16.1's AutoTokenizer path loses Lean text for the cached
+# DeepSeek LlamaTokenizerFast assets. Keep the validated stack reproducible.
+mlx = ["mlx-lm==0.31.3", "transformers==5.0.0", "tokenizers==0.22.2", "huggingface-hub==1.32.0"]
 dev = []
 
 [project.scripts]

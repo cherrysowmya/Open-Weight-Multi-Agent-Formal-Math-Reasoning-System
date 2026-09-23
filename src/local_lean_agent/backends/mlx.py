@@ -48,6 +48,15 @@ class MLXBackend(ModelBackend):
                     f"An MLX server is already using {self.config.base_url}. "
                     "Set managed_server=false to use that external process."
                 )
+            # Same tokenizer loader as MLX-LM. Fail before starting any model
+            # process if Unicode, whitespace or chat-role boundaries are lost.
+            check = subprocess.run(
+                [sys.executable, "-m", "local_lean_agent.backends.tokenizer_check", model_id],
+                capture_output=True, text=True, timeout=self.config.startup_timeout_seconds,
+            )
+            if check.returncode:
+                raise RuntimeError("MLX tokenizer preflight failed: "
+                                   + (check.stdout or check.stderr)[-4000:])
             parsed = urlparse(self.config.base_url)
             host = parsed.hostname or "127.0.0.1"
             port = parsed.port or 8080
